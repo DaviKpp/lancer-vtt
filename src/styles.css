@@ -1123,3 +1123,43 @@ button.tag {
 .quick-cell .num-input {
   width: 38px;
 }
+
+/* portraits */
+.portrait {
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  flex-shrink: 0;
+}
+.portrait.round {
+  border-radius: 50%;
+}
+.sheet-title {
+  gap: 10px;
+  align-items: center;
+}
+.sheet-portraits {
+  position: relative;
+  flex-shrink: 0;
+}
+.pilot-portrait {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  box-shadow: 0 0 0 2px var(--obr-bg);
+  border-radius: 50%;
+  display: flex;
+}
+.sheet-title-text {
+  flex: 1;
+  min-width: 0;
+}
+.combatant-name {
+  gap: 6px;
+}
+.enc-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

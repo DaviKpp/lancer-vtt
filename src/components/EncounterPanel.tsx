@@ -8,6 +8,8 @@ import { useApp } from "./AppContext";
 import { MiniBars } from "./CombatantList";
 import { QuickHp } from "./QuickHp";
 import { StatLine } from "./StatLine";
+import { Portrait } from "./Portrait";
+import { imageFor } from "../lib/images";
 import { SkillChecks } from "./SkillChecks";
 import { StatusChips } from "./Conditions";
 import { SpawnControls } from "./TemplateList";
@@ -225,7 +227,8 @@ function EncounterRow({ c, active, onRemove }: { c: CombatantState; active: bool
     <div className={`enc-row ${done && active ? "done" : ""} ${acting ? "acting" : ""} kind-${c.kind}`}>
       <div className="enc-top">
         <div className="enc-main">
-          <button className="link-btn" onClick={() => visible && app.openSheet(c.id)} disabled={!visible}>
+          <button className="link-btn enc-name" onClick={() => visible && app.openSheet(c.id)} disabled={!visible}>
+            <Portrait src={imageFor(c, sheet)} size={32} />
             <strong>{c.name}</strong>
             {c.tokenId && (
               <span className="badge" title="Vinculado a um token">

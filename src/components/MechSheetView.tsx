@@ -9,6 +9,7 @@ import { Trackers } from "./Trackers";
 import { ActionLine, CostBadges } from "./ActionLine";
 import { DestroyToggle } from "./DestroyToggle";
 import { SkillChecks } from "./SkillChecks";
+import { Portrait } from "./Portrait";
 import { BarragePanel } from "./BarragePanel";
 import { ActionGuide } from "./ActionGuide";
 import { TurnTracker } from "./TurnTracker";
@@ -22,6 +23,7 @@ import { rangeText, Section, signed, Stat, Tags } from "./common";
 export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: CombatantState; editable: boolean }) {
   const app = useApp();
   const [attack, setAttack] = useState<{ key: string; spec: AttackSpec } | null>(null);
+  const [brokenMechImage, setBrokenMechImage] = useState<string>();
   const s = sheet.stats;
   const p = sheet.pilot;
 
@@ -29,10 +31,32 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
   const panel = (key: string) =>
     attack?.key === key ? <AttackPanel attacker={c} spec={attack.spec} onClose={() => setAttack(null)} /> : null;
 
+  const mechImage = sheet.mech.image !== brokenMechImage ? sheet.mech.image : undefined;
+  const pilotLabel = sheet.pilot.callsign || sheet.pilot.name;
+
   return (
     <div className="sheet">
       <div className="sheet-title">
-        <div>
+        {(mechImage || sheet.pilot.image) && (
+          <div className="sheet-portraits">
+            {mechImage ? (
+              <>
+                <Portrait src={mechImage} size={84} alt={sheet.mech.name} onBroken={setBrokenMechImage} />
+                {sheet.pilot.image && (
+                  <span className="pilot-portrait" title={`Piloto: ${pilotLabel}`}>
+                    <Portrait src={sheet.pilot.image} size={36} round alt={sheet.pilot.name} />
+                  </span>
+                )}
+              </>
+            ) : (
+              // No usable mech art: show the pilot as the main portrait instead of a floating badge.
+              <span title={`Piloto: ${pilotLabel}`}>
+                <Portrait src={sheet.pilot.image} size={84} alt={sheet.pilot.name} />
+              </span>
+            )}
+          </div>
+        )}
+        <div className="sheet-title-text">
           <h2>{sheet.mech.name}</h2>
           <div className="muted">
             {sheet.mech.manufacturer} {sheet.mech.frameName}

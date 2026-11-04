@@ -1,4 +1,5 @@
 import type { CombatantState, MechSheet, NpcSheet } from "./types";
+import { shareableImage } from "./images";
 
 export function combatantFromMech(
   sheet: MechSheet,
@@ -32,6 +33,7 @@ export function combatantFromMech(
     maxRepairs: s.repcap,
     activations: 1,
     used: 0,
+    im: shareableImage(sheet.mech.image ?? sheet.pilot.image),
     // Gorgon frame trait: can take 2 reactions per turn
     ...(/gorgon/i.test(sheet.mech.frameId) ? { rpt: 2 } : {}),
   };
@@ -69,6 +71,7 @@ export function combatantFromNpc(
     maxRepairs: 0,
     activations: s.activations,
     used: 0,
+    im: shareableImage(sheet.image),
   };
 }
 

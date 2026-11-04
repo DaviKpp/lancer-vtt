@@ -75,6 +75,10 @@ Desenhado localmente para cada pessoa:
 | Exportação de NPC v2 | Completo se o `.lcp` correspondente estiver importado; senão só os nomes das habilidades. |
 | Exportação de encontro v3 | Importa todos os NPCs como templates. |
 
+**Imagens:** os retratos do piloto, do mech e dos NPCs são importados quando o COMP/CON guarda um link (imagem da galeria ou
+enviada para a nuvem). Imagens só locais do COMP/CON viram apenas um nome de arquivo no export e não podem ser lidas — nesse
+caso o mech usa a arte padrão do frame. Fichas importadas antes desta versão precisam ser importadas de novo para ganhar imagem.
+
 ## Onde os dados ficam
 
 O Owlbear limita os metadados da sala a **16 kB no total**, então:

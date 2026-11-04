@@ -19,6 +19,7 @@ import type {
 import { lookup, manufacturerName, prettifyId, tagName } from "../lib/compendium";
 import { num, toText, uid } from "../lib/util";
 import { statusesOf } from "../lib/effects";
+import { portraitOf } from "../lib/images";
 
 type Bonus = { id: string; val?: any; replace?: boolean };
 
@@ -251,6 +252,7 @@ function parsePilotInfo(p: any, warnings: string[], bonuses: Bonus[]): PilotInfo
 
   return {
     name: p.name ?? "",
+    image: portraitOf(p),
     callsign: p.callsign ?? "",
     playerName: p.player_name ?? "",
     level,
@@ -437,6 +439,7 @@ export function parsePilot(p: any): ParsedPilot {
         frameName: frame?.name ?? prettifyId(m.frame ?? "unknown"),
         manufacturer: manufacturerName(frame?.source),
         mechtype: frame?.mechtype ?? [],
+        image: portraitOf(m) ?? (typeof frame?.image_url === "string" ? frame.image_url : undefined),
       },
       stats,
       mounts,

@@ -4,6 +4,8 @@ import { removeCombatant, setEncounter } from "../obr/room";
 import { sheetStore } from "../obr/sheets";
 import { useApp } from "./AppContext";
 import { StatusChips } from "./Conditions";
+import { Portrait } from "./Portrait";
+import { imageFor } from "../lib/images";
 
 export function MiniBars({ c }: { c: CombatantState }) {
   const pct = (v: number, m: number) => `${Math.max(0, Math.min(100, (v / Math.max(m, 1)) * 100))}%`;
@@ -59,6 +61,7 @@ export function CombatantCard({ c, compact }: { c: CombatantState; compact?: boo
     <div className={`combatant-card kind-${c.kind}`}>
       <button className="combatant-main" onClick={() => app.openSheet(c.id)}>
         <div className="combatant-name">
+          <Portrait src={imageFor(c, sheet)} size={28} />
           <strong>{c.name}</strong>
           {c.tokenId && <span className="badge" title="Vinculado a um token">⛓</span>}
           {inEncounter && <span className="badge">No encontro</span>}

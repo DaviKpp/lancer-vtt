@@ -7,6 +7,7 @@ import type { CombatantState, NpcFeatureSheet, NpcFeatureType, NpcSheet, NpcStat
 import { lookup, prettifyId, tagName } from "../lib/compendium";
 import { tr } from "../lib/i18n";
 import { statusesOf } from "../lib/effects";
+import { portraitOf } from "../lib/images";
 import { num, resolveTierText, tierValue, toText, uid } from "../lib/util";
 
 const FEATURE_TYPES: NpcFeatureType[] = ["weapon", "tech", "system", "trait", "reaction"];
@@ -239,6 +240,7 @@ export function parseNpc(d: any): ParsedNpc {
     stats,
     features,
     description: toText(d.description),
+    image: portraitOf(d),
     warnings: Array.from(new Set(warnings)),
     raw: warnings.length ? d : undefined,
   };

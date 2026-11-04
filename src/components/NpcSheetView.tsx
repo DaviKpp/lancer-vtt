@@ -9,6 +9,7 @@ import { Trackers } from "./Trackers";
 import { ActionLine, CostBadges } from "./ActionLine";
 import { DestroyToggle } from "./DestroyToggle";
 import { SkillChecks } from "./SkillChecks";
+import { Portrait } from "./Portrait";
 import { ActionGuide } from "./ActionGuide";
 import { TurnTracker } from "./TurnTracker";
 import { tr } from "../lib/i18n";
@@ -29,7 +30,12 @@ export function NpcSheetView({ sheet, c, editable }: { sheet: NpcSheet; c?: Comb
   return (
     <div className="sheet">
       <div className="sheet-title">
-        <div>
+        {sheet.image && (
+          <div className="sheet-portraits">
+            <Portrait src={sheet.image} size={84} alt={sheet.name} />
+          </div>
+        )}
+        <div className="sheet-title-text">
           <h2>{sheet.name}</h2>
           <div className="muted">
             {sheet.className} · Tier {sheet.tier}

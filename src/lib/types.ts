@@ -82,6 +82,7 @@ export interface CoreSystemInfo {
 
 export interface PilotInfo {
   name: string;
+  image?: string; // portrait URL from COMP/CON
   callsign: string;
   playerName: string;
   level: number;
@@ -131,6 +132,7 @@ export interface MechSheet {
     frameName: string;
     manufacturer: string;
     mechtype: string[];
+    image?: string; // mech portrait from COMP/CON, or the frame's default art
   };
   stats: MechStats;
   mounts: SheetMount[];
@@ -203,6 +205,7 @@ export interface NpcSheet {
   features: NpcFeatureSheet[];
   description?: string;
   warnings: string[];
+  image?: string; // NPC portrait from COMP/CON
   /** Original COMP/CON data, kept when something couldn't be resolved so it can be re-parsed after a content pack is imported. */
   raw?: unknown;
 }
@@ -244,6 +247,7 @@ export interface CombatantState {
   br?: 1 | 2; // Brace: 1 = braced, waiting for next turn; 2 = in the restricted turn after bracing
   rpt?: number; // reactions allowed per turn (Gorgon: 2)
   dx?: string[]; // uids of destroyed weapons / systems / NPC features (structure damage)
+  im?: string; // portrait URL (http only, so it fits in room metadata) shown to everyone
   st?: string[]; // active statuses / conditions (lancer-data status ids)
 }
 

@@ -8,6 +8,7 @@ import { useApp } from "./AppContext";
 import { ImportButton } from "./ImportButton";
 import { tr } from "../lib/i18n";
 import { ContentPacks } from "./ContentPacks";
+import { Portrait } from "./Portrait";
 
 export function TemplateList({ onOpen }: { onOpen: (id: string) => void }) {
   const templates = useTemplates();
@@ -76,6 +77,7 @@ function TemplateCard({ t, onOpen }: { t: NpcSheet; onOpen: () => void }) {
     <div className="combatant-card kind-npc">
       <button className="combatant-main" onClick={onOpen}>
         <div className="combatant-name">
+          <Portrait src={t.image} size={28} />
           <strong>{t.name}</strong>
           {live > 0 && <span className="badge">{live} na sala</span>}
         </div>
