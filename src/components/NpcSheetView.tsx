@@ -32,7 +32,7 @@ export function NpcSheetView({ sheet, c, editable }: { sheet: NpcSheet; c?: Comb
       <div className="sheet-title">
         {sheet.image && (
           <div className="sheet-portraits">
-            <Portrait src={sheet.image} size={84} alt={sheet.name} />
+            <Portrait src={sheet.image} size={252} alt={sheet.name} />
           </div>
         )}
         <div className="sheet-title-text">

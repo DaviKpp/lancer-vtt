@@ -77,7 +77,7 @@ function TemplateCard({ t, onOpen }: { t: NpcSheet; onOpen: () => void }) {
     <div className="combatant-card kind-npc">
       <button className="combatant-main" onClick={onOpen}>
         <div className="combatant-name">
-          <Portrait src={t.image} size={28} />
+          <Portrait src={t.image} size={84} />
           <strong>{t.name}</strong>
           {live > 0 && <span className="badge">{live} na sala</span>}
         </div>

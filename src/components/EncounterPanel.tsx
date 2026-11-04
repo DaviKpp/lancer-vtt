@@ -228,7 +228,7 @@ function EncounterRow({ c, active, onRemove }: { c: CombatantState; active: bool
       <div className="enc-top">
         <div className="enc-main">
           <button className="link-btn enc-name" onClick={() => visible && app.openSheet(c.id)} disabled={!visible}>
-            <Portrait src={imageFor(c, sheet)} size={32} />
+            <Portrait src={imageFor(c, sheet)} size={96} />
             <strong>{c.name}</strong>
             {c.tokenId && (
               <span className="badge" title="Vinculado a um token">

@@ -41,17 +41,17 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
           <div className="sheet-portraits">
             {mechImage ? (
               <>
-                <Portrait src={mechImage} size={84} alt={sheet.mech.name} onBroken={setBrokenMechImage} />
+                <Portrait src={mechImage} size={252} alt={sheet.mech.name} onBroken={setBrokenMechImage} />
                 {sheet.pilot.image && (
                   <span className="pilot-portrait" title={`Piloto: ${pilotLabel}`}>
-                    <Portrait src={sheet.pilot.image} size={36} round alt={sheet.pilot.name} />
+                    <Portrait src={sheet.pilot.image} size={108} round alt={sheet.pilot.name} />
                   </span>
                 )}
               </>
             ) : (
               // No usable mech art: show the pilot as the main portrait instead of a floating badge.
               <span title={`Piloto: ${pilotLabel}`}>
-                <Portrait src={sheet.pilot.image} size={84} alt={sheet.pilot.name} />
+                <Portrait src={sheet.pilot.image} size={252} alt={sheet.pilot.name} />
               </span>
             )}
           </div>
