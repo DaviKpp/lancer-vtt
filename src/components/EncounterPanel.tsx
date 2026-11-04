@@ -7,6 +7,8 @@ import { linkToken, patchCombatant, patchCombatants, setEncounter } from "../obr
 import { useApp } from "./AppContext";
 import { MiniBars } from "./CombatantList";
 import { QuickHp } from "./QuickHp";
+import { StatLine } from "./StatLine";
+import { SkillChecks } from "./SkillChecks";
 import { StatusChips } from "./Conditions";
 import { SpawnControls } from "./TemplateList";
 import { deleteInstances } from "../obr/spawn";
@@ -233,7 +235,9 @@ function EncounterRow({ c, active, onRemove }: { c: CombatantState; active: bool
           </button>
           <div className="muted small">{visible ? c.sub : c.kind === "npc" ? "Hostil" : c.ownerName}</div>
           {visible && <MiniBars c={c} />}
+          {visible && sheet && <StatLine sheet={sheet} />}
           {editable && <QuickHp c={c} />}
+          {visible && sheet && <SkillChecks c={c} sheet={sheet} editable={editable} />}
           <StatusChips c={c} />
           {visible && active && <TurnTracker c={c} editable={editable} compact />}
           {!visible && c.structure === 0 && <span className="badge badge-off">Destruído</span>}

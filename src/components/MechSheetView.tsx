@@ -8,6 +8,7 @@ import { LinkControls } from "./LinkControls";
 import { Trackers } from "./Trackers";
 import { ActionLine, CostBadges } from "./ActionLine";
 import { DestroyToggle } from "./DestroyToggle";
+import { SkillChecks } from "./SkillChecks";
 import { BarragePanel } from "./BarragePanel";
 import { ActionGuide } from "./ActionGuide";
 import { TurnTracker } from "./TurnTracker";
@@ -49,6 +50,7 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
       <LinkControls c={c} editable={editable} />
 
       <TurnTracker c={c} editable={editable} />
+      <SkillChecks c={c} sheet={sheet} editable={editable} />
       <Section title="Guia de ações" defaultOpen={false}>
         <ActionGuide c={c} sheet={sheet} editable={editable} />
       </Section>

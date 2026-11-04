@@ -279,7 +279,7 @@ export interface RollResult {
   attackerName: string;
   targetId?: string;
   targetName?: string;
-  kind: "attack" | "tech" | "damage" | "check" | "action";
+  kind: "attack" | "tech" | "damage" | "check" | "action" | "skill";
   label: string; // weapon / action name
   d20: number;
   accDice: number[]; // the d6 accuracy/difficulty dice

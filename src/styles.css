@@ -1008,14 +1008,14 @@ button.tag {
   border-left-color: var(--heat);
 }
 
-.quick-hp {
+.quick-amount {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-top: 4px;
   flex-wrap: wrap;
 }
-.quick-hp .num-input {
+.quick-amount .num-input {
   width: 46px;
 }
 
@@ -1046,4 +1046,80 @@ button.tag {
 }
 .attack-panel .form-grid {
   grid-template-columns: 96px 1fr;
+}
+
+/* attributes, skill checks and quick editor in the encounter */
+.stat-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+.stat-pill {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.skill-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.skill-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.skill-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 2px;
+  border-radius: 6px;
+  border: 1px solid var(--obr-primary);
+  background: rgba(187, 153, 255, 0.12);
+}
+.skill-btn.on {
+  background: var(--obr-primary);
+  color: var(--obr-primary-contrast);
+}
+.skill-btn:disabled {
+  opacity: 1;
+  border-color: var(--line);
+  background: var(--card);
+}
+.skill-name {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.skill-val {
+  font-size: 15px;
+  font-weight: 800;
+}
+.quick-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.quick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+}
+.quick-cell {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.quick-cell .tracker-label {
+  width: 66px;
+  font-size: 10px;
+}
+.quick-cell .num-input {
+  width: 38px;
 }

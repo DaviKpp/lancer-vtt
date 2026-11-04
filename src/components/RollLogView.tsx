@@ -45,6 +45,29 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
     await OBR.notification.show(log.join(" · "), state.structure < target.structure ? "WARNING" : "INFO");
   };
 
+  if (r.kind === "skill") {
+    return (
+      <div className={`roll-card ${r.outcome === "hit" ? "roll-hit" : "roll-miss"}`}>
+        <div className="roll-top">
+          <span className="roll-who">{r.attackerName}</span>
+          <span className="roll-label">🎲 {r.label}</span>
+          <span className="roll-time">{new Date(r.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+        <div className="roll-main">
+          <span className="roll-total">{r.total}</span>
+          <span className="roll-vs">contra {r.defense}</span>
+          <span className={`roll-outcome ${r.outcome}`}>{r.outcome === "hit" ? "SUCESSO" : "FALHA"}</span>
+        </div>
+        <div className="roll-detail mono">
+          d20[{r.d20}] {r.bonus >= 0 ? "+" : "−"} {Math.abs(r.bonus)}
+          {r.accDice.length > 0 &&
+            ` ${r.netAccuracy > 0 ? "+" : "−"} ${Math.max(...r.accDice)} (${r.netAccuracy > 0 ? "prec" : "dif"} ${r.accDice.join(",")})`}
+        </div>
+        {r.notes?.length ? <div className="muted small">{r.notes.join(" · ")}</div> : null}
+      </div>
+    );
+  }
+
   if (r.kind === "check") {
     return (
       <div className={`roll-card roll-check ${r.applied?.includes("DESTRUÍDO") ? "roll-miss" : ""}`}>

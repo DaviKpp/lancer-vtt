@@ -70,6 +70,13 @@ export const rollLog = new RollLog();
 export async function publishRoll(r: RollResult) {
   rollLog.add(r);
   await OBR.broadcast.sendMessage(ROLL_CHANNEL, r, { destination: "REMOTE" });
+  if (r.kind === "skill") {
+    await OBR.notification.show(
+      `${r.attackerName}: ${r.label} ${r.total} (alvo ${r.defense}) — ${r.outcome === "hit" ? "SUCESSO" : "FALHA"}`,
+      r.outcome === "hit" ? "SUCCESS" : "WARNING",
+    );
+    return;
+  }
   if (r.kind === "check") {
     await OBR.notification.show(`${r.attackerName}: ${r.label} (menor ${r.total})${r.applied?.length ? ` — ${r.applied.join(", ")}` : ""}`, "WARNING");
     return;

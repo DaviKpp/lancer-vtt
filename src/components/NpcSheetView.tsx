@@ -8,6 +8,7 @@ import { LinkControls } from "./LinkControls";
 import { Trackers } from "./Trackers";
 import { ActionLine, CostBadges } from "./ActionLine";
 import { DestroyToggle } from "./DestroyToggle";
+import { SkillChecks } from "./SkillChecks";
 import { ActionGuide } from "./ActionGuide";
 import { TurnTracker } from "./TurnTracker";
 import { tr } from "../lib/i18n";
@@ -44,6 +45,7 @@ export function NpcSheetView({ sheet, c, editable }: { sheet: NpcSheet; c?: Comb
           <Conditions c={c} editable={editable} />
           <LinkControls c={c} editable={editable} />
           <TurnTracker c={c} editable={editable} />
+          <SkillChecks c={c} sheet={sheet} editable={editable} />
           <Section title="Guia de ações" defaultOpen={false}>
             <ActionGuide c={c} sheet={sheet} editable={editable} />
           </Section>
