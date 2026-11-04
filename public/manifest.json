@@ -1,0 +1,16 @@
+{
+  "name": "LANCER VTT",
+  "version": "0.1.0",
+  "manifest_version": 1,
+  "description": "Encontros de LANCER: importe pilotos e NPCs do COMP/CON, acompanhe mechs e role ataques.",
+  "author": "dk",
+  "icon": "/icon.svg",
+  "background_url": "/background.html",
+  "action": {
+    "title": "LANCER VTT",
+    "icon": "/icon.svg",
+    "popover": "/",
+    "width": 440,
+    "height": 720
+  }
+}

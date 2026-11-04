@@ -1,0 +1,363 @@
+// Token HUD: bars and labels drawn on top of linked tokens.
+//
+// Uses OBR *local* items (each client draws its own, nothing is synced), which lets every
+// viewer see something different:
+//   - Lancers (player mechs): everyone sees HP + conditions above the token and
+//     heat / structure / stress below it.
+//   - NPCs: the GM sees the same as above; players only see statuses and conditions.
+import OBR, { buildShape, buildText, type Item } from "@owlbear-rodeo/sdk";
+import type { CombatantState } from "../lib/types";
+import { activeStatuses, statusInfo } from "../lib/statuses";
+import { HUD_KEY } from "./constants";
+import { readRoomState } from "./room";
+
+type Role = "GM" | "PLAYER";
+type Vec = { x: number; y: number };
+
+interface RectSpec {
+  kind: "rect";
+  id: string;
+  tokenId: string;
+  position: Vec;
+  width: number;
+  height: number;
+  color: string;
+  opacity: number;
+  z: number;
+}
+interface TextSpec {
+  kind: "text";
+  id: string;
+  tokenId: string;
+  position: Vec;
+  width: number;
+  height: number;
+  text: string;
+  color: string;
+  fontSize: number;
+  align: "TOP" | "BOTTOM";
+  z: number;
+}
+type Spec = RectSpec | TextSpec;
+
+const COLORS = {
+  barBg: "#111318",
+  hp: "#3fb36b",
+  hpLow: "#e2382c",
+  shield: "#4fa3ff",
+  heat: "#f08a24",
+  text: "#ffffff",
+  condition: "#ff8a80", // conditions (Emperrado, Lento...) — red
+  status: "#8ecbff", // statuses (Oculto, Exposto...) — blue
+  outline: "#000000",
+};
+
+function round(v: number) {
+  return Math.round(v * 10) / 10;
+}
+
+/** Builds the HUD pieces for one token. `b` is the token's bounding box. */
+function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, dpi: number, role: Role): Spec[] {
+  const showNumbers = c.kind === "mech" || role === "GM";
+  const active = activeStatuses(c).map((sid) => statusInfo(sid));
+  const names = (type: "Status" | "Condition") =>
+    active
+      .filter((x) => x?.type === type)
+      .map((x) => x!.name)
+      .join(" · ");
+  const conditions = names("Condition");
+  const statuses = names("Status");
+  if (!showNumbers && !conditions && !statuses) return [];
+
+  const id = (part: string) => `${HUD_KEY}/${c.tokenId}/${part}`;
+  const tokenId = c.tokenId as string;
+  const w = b.width;
+  const cx = (b.min.x + b.max.x) / 2;
+  const gap = dpi * 0.04;
+  const barH = Math.max(4, dpi * 0.09);
+  const font = Math.max(10, dpi * 0.15);
+  const lineH = font * 1.25;
+  const textW = Math.max(w * 3, dpi * 3);
+  const out: Spec[] = [];
+
+  // ---- above the token (stacking upwards) ----
+  let y = b.min.y - gap;
+  if (showNumbers) {
+    y -= barH;
+    const ratio = Math.max(0, Math.min(1, c.hp / Math.max(1, c.maxHp)));
+    out.push({ kind: "rect", id: id("hp-bg"), tokenId, position: { x: b.min.x, y }, width: w, height: barH, color: COLORS.barBg, opacity: 0.75, z: 0 });
+    if (ratio > 0)
+      out.push({
+        kind: "rect",
+        id: id("hp"),
+        tokenId,
+        position: { x: b.min.x, y },
+        width: w * ratio,
+        height: barH,
+        color: ratio <= 0.25 ? COLORS.hpLow : COLORS.hp,
+        opacity: 1,
+        z: 1,
+      });
+    if (c.os > 0)
+      out.push({
+        kind: "rect",
+        id: id("os"),
+        tokenId,
+        position: { x: b.min.x, y: y - barH * 0.45 },
+        width: w * Math.min(1, c.os / Math.max(1, c.maxHp)),
+        height: barH * 0.4,
+        color: COLORS.shield,
+        opacity: 1,
+        z: 2,
+      });
+    y -= gap * 0.5 + lineH;
+    out.push({
+      kind: "text",
+      id: id("hp-text"),
+      tokenId,
+      position: { x: cx - textW / 2, y },
+      width: textW,
+      height: lineH,
+      text: `PV ${c.hp}/${c.maxHp}${c.os ? ` (+${c.os})` : ""}`,
+      color: COLORS.text,
+      fontSize: font,
+      align: "BOTTOM",
+      z: 3,
+    });
+  }
+  // Conditions sit right above the HP; statuses go on top of them, each in its own color.
+  const line = (part: string, text: string, color: string) => {
+    y -= lineH;
+    out.push({
+      kind: "text",
+      id: id(part),
+      tokenId,
+      position: { x: cx - textW / 2, y },
+      width: textW,
+      height: lineH,
+      text,
+      color,
+      fontSize: font * 0.9,
+      align: "BOTTOM",
+      z: 3,
+    });
+  };
+  if (conditions) line("conditions", conditions, COLORS.condition);
+  if (statuses) line("statuses", statuses, COLORS.status);
+
+  // ---- below the token ----
+  if (showNumbers) {
+    let by = b.max.y + gap;
+    const heatRatio = Math.max(0, Math.min(1, c.heat / Math.max(1, c.heatcap)));
+    if (c.heatcap > 0) {
+      out.push({ kind: "rect", id: id("heat-bg"), tokenId, position: { x: b.min.x, y: by }, width: w, height: barH, color: COLORS.barBg, opacity: 0.75, z: 0 });
+      if (heatRatio > 0)
+        out.push({ kind: "rect", id: id("heat"), tokenId, position: { x: b.min.x, y: by }, width: w * heatRatio, height: barH, color: COLORS.heat, opacity: 1, z: 1 });
+      by += barH + gap * 0.5;
+    }
+    out.push({
+      kind: "text",
+      id: id("bottom-text"),
+      tokenId,
+      position: { x: cx - textW / 2, y: by },
+      width: textW,
+      height: lineH * 2,
+      text: `Calor ${c.heat}/${c.heatcap}${c.burn ? ` · Queim. ${c.burn}` : ""}\nEstrutura ${c.structure}/${c.maxStructure} · Estresse ${c.stress}/${c.maxStress}`,
+      color: COLORS.text,
+      fontSize: font * 0.9,
+      align: "TOP",
+      z: 3,
+    });
+  }
+  return out.map((s) => ({ ...s, position: { x: round(s.position.x), y: round(s.position.y) } }));
+}
+
+function build(s: Spec): Item {
+  // Shared item settings; both builders support these (typed loosely to chain across builder types).
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+  const common = <T,>(b: T): T =>
+    (b as any)
+      .id(s.id)
+      .name("LANCER HUD")
+      .position(s.position)
+      .attachedTo(s.tokenId)
+      .layer("ATTACHMENT")
+      .locked(true)
+      .disableHit(true)
+      .disableAutoZIndex(true)
+      .zIndex(s.z)
+      .disableAttachmentBehavior(["ROTATION", "SCALE", "LOCKED", "COPY"])
+      .metadata({ [HUD_KEY]: s.tokenId });
+  if (s.kind === "rect") {
+    return common(buildShape())
+      .shapeType("RECTANGLE")
+      .width(s.width)
+      .height(s.height)
+      .fillColor(s.color)
+      .fillOpacity(s.opacity)
+      .strokeWidth(0)
+      .strokeOpacity(0)
+      .build();
+  }
+  return common(buildText())
+    .textType("PLAIN")
+    .plainText(s.text)
+    .width(s.width)
+    .height(s.height)
+    .fontSize(s.fontSize)
+    .fontWeight(700)
+    .fillColor(s.color)
+    .strokeColor(COLORS.outline)
+    .strokeOpacity(1)
+    .strokeWidth(Math.max(1, s.fontSize * 0.12))
+    .textAlign("CENTER")
+    .textAlignVertical(s.align)
+    .padding(0)
+    .lineHeight(1.25)
+    .build();
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function applyTo(draft: any, s: Spec) {
+  draft.position = s.position;
+  draft.zIndex = s.z;
+  if (s.kind === "rect") {
+    draft.width = s.width;
+    draft.height = s.height;
+    draft.style.fillColor = s.color;
+    draft.style.fillOpacity = s.opacity;
+  } else {
+    draft.text.plainText = s.text;
+    draft.text.width = s.width;
+    draft.text.height = s.height;
+    draft.text.style.fillColor = s.color;
+    draft.text.style.fontSize = s.fontSize;
+    draft.text.style.textAlignVertical = s.align;
+  }
+}
+
+/** Starts the HUD renderer. Call once from the background page. */
+export function startHud() {
+  let role: Role = "PLAYER";
+  let combatants: Record<string, CombatantState> = {};
+  let sceneReady = false;
+  let tokens: Item[] = [];
+  const rendered = new Map<string, string>(); // id -> serialized spec
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let running = false;
+  let again = false;
+
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => void render(), 120);
+  };
+
+  async function clearAll() {
+    rendered.clear();
+    try {
+      const mine = await OBR.scene.local.getItems((i) => i.metadata[HUD_KEY] !== undefined);
+      if (mine.length) await OBR.scene.local.deleteItems(mine.map((i) => i.id));
+    } catch {
+      // scene closed
+    }
+  }
+
+  async function render() {
+    if (running) {
+      again = true;
+      return;
+    }
+    running = true;
+    try {
+      if (!sceneReady) return;
+      const dpi = await OBR.scene.grid.getDpi();
+      const present = new Set(tokens.map((t) => t.id));
+      const desired: Spec[] = [];
+      for (const c of Object.values(combatants)) {
+        if (!c.tokenId || !present.has(c.tokenId)) continue;
+        const b = await OBR.scene.items.getItemBounds([c.tokenId]);
+        desired.push(...specsFor(c, b, dpi, role));
+      }
+      const want = new Map(desired.map((s) => [s.id, s]));
+      const existing = new Set(
+        (await OBR.scene.local.getItems((i) => i.metadata[HUD_KEY] !== undefined)).map((i) => i.id),
+      );
+
+      const toDelete = [...existing].filter((id) => !want.has(id));
+      const toAdd = desired.filter((s) => !existing.has(s.id));
+      const toUpdate = desired.filter((s) => existing.has(s.id) && rendered.get(s.id) !== JSON.stringify(s));
+      // A rect that turned into... (kinds never change for an id, so updates are safe)
+
+      if (toDelete.length) await OBR.scene.local.deleteItems(toDelete);
+      if (toAdd.length) await OBR.scene.local.addItems(toAdd.map(build));
+      if (toUpdate.length) {
+        const byId = new Map(toUpdate.map((s) => [s.id, s]));
+        await OBR.scene.local.updateItems(
+          toUpdate.map((s) => s.id),
+          (drafts) => {
+            for (const d of drafts) {
+              const s = byId.get(d.id);
+              if (s) applyTo(d, s);
+            }
+          },
+        );
+      }
+      rendered.clear();
+      for (const s of desired) rendered.set(s.id, JSON.stringify(s));
+    } catch (e) {
+      console.warn("[lancer-vtt] HUD render failed", e);
+    } finally {
+      running = false;
+      if (again) {
+        again = false;
+        schedule();
+      }
+    }
+  }
+
+  const onItems = (items: Item[]) => {
+    const linked = new Set(Object.values(combatants).map((c) => c.tokenId).filter(Boolean));
+    const next = items.filter((i) => linked.has(i.id));
+    // Only re-render when a linked token actually changed (position/size/visibility...).
+    const sig = (list: Item[]) => JSON.stringify(list.map((i) => [i.id, i.position, i.scale, i.rotation, i.visible]));
+    if (sig(next) !== sig(tokens)) {
+      tokens = next;
+      schedule();
+    }
+  };
+
+  OBR.onReady(async () => {
+    role = await OBR.player.getRole();
+    OBR.player.onChange((p) => {
+      if (p.role !== role) {
+        role = p.role;
+        schedule();
+      }
+    });
+
+    combatants = readRoomState(await OBR.room.getMetadata()).combatants;
+    OBR.room.onMetadataChange((m) => {
+      combatants = readRoomState(m).combatants;
+      // refresh which tokens matter, then draw
+      void OBR.scene.isReady().then(async (ready) => {
+        if (ready) onItems(await OBR.scene.items.getItems());
+        schedule();
+      });
+    });
+
+    const onReady = async (ready: boolean) => {
+      sceneReady = ready;
+      if (ready) {
+        await clearAll(); // remove leftovers from a previous session
+        onItems(await OBR.scene.items.getItems());
+        schedule();
+      } else {
+        tokens = [];
+        rendered.clear();
+      }
+    };
+    OBR.scene.onReadyChange(onReady);
+    OBR.scene.items.onChange(onItems);
+    await onReady(await OBR.scene.isReady());
+  });
+}
