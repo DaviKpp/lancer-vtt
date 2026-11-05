@@ -3,7 +3,7 @@
 // (dice.html) that throws them and closes itself when done.
 import OBR from "@owlbear-rodeo/sdk";
 import type { RollResult } from "../lib/types";
-import { diceForRoll, type DiceShow } from "../lib/diceShow";
+import { diceForRoll, type DicePhase, type DiceShow } from "../lib/diceShow";
 import { ID } from "./constants";
 import { loadDiceSet } from "../lib/diceSets";
 
@@ -18,18 +18,20 @@ const REVEAL_MARGIN = 300; // other players' popovers may start a little later t
  * Throws the dice for a roll and waits until they stop, so nothing reveals the result early.
  * Returns whether dice were thrown (false: GM roll or a roll without dice — nothing to wait for).
  */
-export async function throwDiceAndWait(r: RollResult): Promise<boolean> {
+export async function throwDiceAndWait(r: RollResult, phase: DicePhase = "all"): Promise<boolean> {
+  const found = diceForRoll(r, phase);
+  if (!found) return false;
   let off: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   // listen before throwing, so a fast "settled" can't be missed
   const settled = new Promise<void>((resolve) => {
     off = OBR.broadcast.onMessage(DICE_SETTLED_CHANNEL, (e) => {
-      if ((e.data as { id?: string })?.id === r.id) resolve();
+      if ((e.data as { id?: string })?.id === found.id) resolve();
     });
     timer = setTimeout(resolve, SETTLE_TIMEOUT);
   });
   try {
-    const thrown = await throwDice(r);
+    const thrown = await sendDice(found);
     if (thrown) {
       await settled;
       await new Promise((res) => setTimeout(res, REVEAL_MARGIN));
@@ -41,10 +43,8 @@ export async function throwDiceAndWait(r: RollResult): Promise<boolean> {
   }
 }
 
-/** Called for every published roll: only rolls made by players are thrown on screen. Returns whether dice were thrown. */
-export async function throwDice(r: RollResult): Promise<boolean> {
-  const found = diceForRoll(r);
-  if (!found) return false;
+/** Only rolls made by players are thrown on screen. Returns whether dice were thrown. */
+async function sendDice(found: DiceShow): Promise<boolean> {
   const show: DiceShow = { ...found, set: loadDiceSet() };
   try {
     if ((await OBR.player.getRole()) !== "PLAYER") return false;

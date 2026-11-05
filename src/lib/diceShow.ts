@@ -39,11 +39,19 @@ function diceInDetail(detail: string, tone: DieTone): ShownDie[] {
   return out;
 }
 
-export function diceForRoll(r: RollResult): DiceShow | null {
-  const dice: ShownDie[] = [];
-  if (r.d20 > 0) dice.push({ sides: 20, value: r.d20, tone: "main", kept: true });
+/**
+ * Which dice of a roll to throw: everything at once, or — for attacks — the to-hit dice first
+ * ("hit": d20 + accuracy/difficulty) and the damage dice once the hit is revealed ("damage").
+ */
+export type DicePhase = "all" | "hit" | "damage";
 
-  if (r.accDice?.length) {
+export function diceForRoll(r: RollResult, phase: DicePhase = "all"): DiceShow | null {
+  const dice: ShownDie[] = [];
+  const toHit = phase !== "damage";
+  const damage = phase !== "hit";
+  if (toHit && r.d20 > 0) dice.push({ sides: 20, value: r.d20, tone: "main", kept: true });
+
+  if (toHit && r.accDice?.length) {
     const check = r.kind === "check";
     const pick = check ? Math.min(...r.accDice) : Math.max(...r.accDice);
     const at = r.accDice.indexOf(pick);
@@ -51,22 +59,24 @@ export function diceForRoll(r: RollResult): DiceShow | null {
     r.accDice.forEach((value, i) => dice.push({ sides: 6, value, tone, kept: i === at }));
   }
 
-  for (const d of r.damage ?? []) dice.push(...diceInDetail(d.detail ?? "", "dmg"));
-  if (r.kind === "action") for (const n of r.notes ?? []) dice.push(...diceInDetail(n, "dmg"));
+  if (damage) for (const d of r.damage ?? []) dice.push(...diceInDetail(d.detail ?? "", "dmg"));
+  if (damage && r.kind === "action") for (const n of r.notes ?? []) dice.push(...diceInDetail(n, "dmg"));
 
   if (!dice.length) return null;
 
   const parts: string[] = [];
-  if (r.kind === "check") parts.push(`menor ${r.total}`);
-  else if (r.kind !== "action" && r.kind !== "damage") parts.push(String(r.total));
-  if (r.kind === "skill" && r.outcome) parts.push(r.outcome === "hit" ? "SUCESSO" : "FALHA");
-  else if (r.outcome) parts.push(OUTCOME_PT[r.outcome]);
+  if (toHit) {
+    if (r.kind === "check") parts.push(`menor ${r.total}`);
+    else if (r.kind !== "action" && r.kind !== "damage") parts.push(String(r.total));
+    if (r.kind === "skill" && r.outcome) parts.push(r.outcome === "hit" ? "SUCESSO" : "FALHA");
+    else if (r.outcome) parts.push(OUTCOME_PT[r.outcome]);
+  }
   const dmg = (r.damage ?? []).reduce((a, d) => a + d.amount, 0);
-  if (dmg > 0) parts.push(`${dmg} de dano`);
+  if (damage && dmg > 0) parts.push(`${dmg} de dano`);
   if (r.applied?.length) parts.push(r.applied.join(", "));
 
   return {
-    id: r.id,
+    id: phase === "all" ? r.id : `${r.id}:${phase}`,
     byId: r.byId,
     title: r.by && r.by !== r.attackerName ? `${r.attackerName} (${r.by})` : r.attackerName,
     label: r.targetName && r.targetId !== r.attackerId ? `${r.label} → ${r.targetName}` : r.label,
