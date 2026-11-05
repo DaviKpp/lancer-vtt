@@ -9,17 +9,50 @@ import { loadDiceSet } from "../lib/diceSets";
 
 export const DICE_POPOVER_ID = `${ID}/dice`;
 const DICE_CHANNEL = `${ID}/dice`;
+/** The roller's dice popover says when its dice stopped (LOCAL), so the result can be revealed. */
+export const DICE_SETTLED_CHANNEL = `${ID}/dice-settled`;
+const SETTLE_TIMEOUT = 4500; // if the popover never reports (failed to open...), reveal anyway
+const REVEAL_MARGIN = 300; // other players' popovers may start a little later than the roller's
 
-/** Called for every published roll: only rolls made by players are thrown on screen. */
-export async function throwDice(r: RollResult) {
+/**
+ * Throws the dice for a roll and waits until they stop, so nothing reveals the result early.
+ * Returns whether dice were thrown (false: GM roll or a roll without dice — nothing to wait for).
+ */
+export async function throwDiceAndWait(r: RollResult): Promise<boolean> {
+  let off: (() => void) | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // listen before throwing, so a fast "settled" can't be missed
+  const settled = new Promise<void>((resolve) => {
+    off = OBR.broadcast.onMessage(DICE_SETTLED_CHANNEL, (e) => {
+      if ((e.data as { id?: string })?.id === r.id) resolve();
+    });
+    timer = setTimeout(resolve, SETTLE_TIMEOUT);
+  });
+  try {
+    const thrown = await throwDice(r);
+    if (thrown) {
+      await settled;
+      await new Promise((res) => setTimeout(res, REVEAL_MARGIN));
+    }
+    return thrown;
+  } finally {
+    off?.();
+    clearTimeout(timer);
+  }
+}
+
+/** Called for every published roll: only rolls made by players are thrown on screen. Returns whether dice were thrown. */
+export async function throwDice(r: RollResult): Promise<boolean> {
   const found = diceForRoll(r);
-  if (!found) return;
+  if (!found) return false;
   const show: DiceShow = { ...found, set: loadDiceSet() };
   try {
-    if ((await OBR.player.getRole()) !== "PLAYER") return;
+    if ((await OBR.player.getRole()) !== "PLAYER") return false;
     await OBR.broadcast.sendMessage(DICE_CHANNEL, show, { destination: "ALL" });
+    return true;
   } catch (e) {
     console.warn("[lancer-vtt] dice broadcast failed", e);
+    return false;
   }
 }
 

@@ -5,7 +5,7 @@ import { rollAccuracy, rollDie, rollExpression } from "../lib/dice";
 import { uid } from "../lib/util";
 import { ROLL_CHANNEL } from "./constants";
 import { announce } from "./announce";
-import { throwDice } from "./dice";
+import { throwDiceAndWait } from "./dice";
 import { tr } from "../lib/i18n";
 
 const MAX_LOG = 60;
@@ -69,23 +69,31 @@ class RollLog {
 
 export const rollLog = new RollLog();
 
-export async function publishRoll(r: RollResult) {
+/**
+ * Posts a roll to the log and notifications. Player rolls first throw the 3D dice and wait until they
+ * stop, so the result isn't revealed early; pass `thrown` if the caller already did that
+ * (throwDiceAndWait) before applying the roll's effects.
+ */
+export async function publishRoll(r: RollResult, opts: { thrown?: boolean } = {}) {
+  const thrown = opts.thrown ?? (await throwDiceAndWait(r));
   rollLog.add(r);
   await OBR.broadcast.sendMessage(ROLL_CHANNEL, r, { destination: "REMOTE" });
-  void throwDice(r); // 3D dice on everyone's screen (player rolls only)
+  // The roller already read the result on the dice caption, so the general notification goes only to the others.
+  const local = !thrown;
   if (r.kind === "skill") {
     await announce(
       `${r.attackerName}: ${r.label} ${r.total} (alvo ${r.defense}) — ${r.outcome === "hit" ? "SUCESSO" : "FALHA"}`,
       r.outcome === "hit" ? "SUCCESS" : "WARNING",
+      { local },
     );
     return;
   }
   if (r.kind === "check") {
-    await announce(`${r.attackerName}: ${r.label} (menor ${r.total})${r.applied?.length ? ` — ${r.applied.join(", ")}` : ""}`, "WARNING");
+    await announce(`${r.attackerName}: ${r.label} (menor ${r.total})${r.applied?.length ? ` — ${r.applied.join(", ")}` : ""}`, "WARNING", { local });
     return;
   }
   if (r.kind === "action") {
-    await announce(`${r.attackerName}: ${r.label}${r.notes?.length ? ` — ${r.notes.join(" · ")}` : ""}`, "INFO");
+    await announce(`${r.attackerName}: ${r.label}${r.notes?.length ? ` — ${r.notes.join(" · ")}` : ""}`, "INFO", { local });
     return;
   }
   const outcome = r.outcome ? ` — ${OUTCOME_PT[r.outcome]}` : "";
@@ -93,6 +101,7 @@ export async function publishRoll(r: RollResult) {
   await announce(
     `${r.attackerName}: ${r.label} ${r.total}${r.targetName ? ` contra ${r.targetName}` : ""}${outcome}${dmg}`,
     r.outcome === "miss" ? "WARNING" : r.outcome ? "SUCCESS" : "INFO",
+    { local },
   );
 }
 

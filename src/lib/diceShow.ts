@@ -63,6 +63,7 @@ export function diceForRoll(r: RollResult): DiceShow | null {
   else if (r.outcome) parts.push(OUTCOME_PT[r.outcome]);
   const dmg = (r.damage ?? []).reduce((a, d) => a + d.amount, 0);
   if (dmg > 0) parts.push(`${dmg} de dano`);
+  if (r.applied?.length) parts.push(r.applied.join(", "));
 
   return {
     id: r.id,

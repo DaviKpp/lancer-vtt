@@ -5,6 +5,7 @@ import { autoModifiers, defenseFor, type Cover } from "../lib/modifiers";
 import { applyOnHit } from "./effects";
 import { getRoomState, patchCombatant } from "./room";
 import { publishRoll, rollAttack } from "./rolls";
+import { throwDiceAndWait } from "./dice";
 
 export interface AttackOptions {
   targetId?: string;
@@ -59,6 +60,9 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
     } else r = { ...r, notes: [...(r.notes ?? []), "Alvo Invisível: passou nos 50%"] };
   }
 
+  // Dice first: effects on the target (conditions, heat, Lock On...) only land once they stop.
+  const thrown = await throwDiceAndWait(r);
+
   r = await applyOnHit(r, spec);
 
   // Lock On is consumed; attacking reveals a Hidden attacker
@@ -72,6 +76,6 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
     r = { ...r, notes: [...(r.notes ?? []), "Atacar revelou o atacante (deixou de estar Oculto)"] };
   }
 
-  await publishRoll(r);
+  await publishRoll(r, { thrown });
   return r;
 }

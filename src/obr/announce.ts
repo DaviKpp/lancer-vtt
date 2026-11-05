@@ -19,10 +19,11 @@ interface Announcement {
 export async function announce(
   message: string,
   variant: Variant = "INFO",
-  opts: { subject?: CombatantState; publicMessage?: string } = {},
+  /** local: false = only the other players get it (e.g. the roller already sees the dice caption). */
+  opts: { subject?: CombatantState; publicMessage?: string; local?: boolean } = {},
 ) {
   if (!message) return;
-  await notify(message, variant);
+  if (opts.local !== false) await notify(message, variant);
   const msg: Announcement = { message, variant };
   if (opts.subject) {
     msg.owner = opts.subject.owner;

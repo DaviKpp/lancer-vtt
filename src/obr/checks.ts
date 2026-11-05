@@ -4,6 +4,7 @@ import { statusInfo } from "../lib/statuses";
 import { uid } from "../lib/util";
 import { getRoomState, patchCombatant } from "./room";
 import { publishRoll } from "./rolls";
+import { throwDiceAndWait } from "./dice";
 
 type By = { id: string; name: string };
 
@@ -26,11 +27,7 @@ async function runCheck(id: string, kind: CheckKind, remaining: number, by: By) 
   // characters with a single point (most NPCs) are simply destroyed; at 0 there is no roll
   if (max <= 1 || remaining < 1) return;
   const r = rollCheck(kind, remaining, max);
-  const applied: string[] = [];
-  if (r.statuses.length) {
-    await patchCombatant(c.id, { st: Array.from(new Set([...(c.st ?? []), ...r.statuses])) });
-    applied.push(...r.statuses.map((s) => statusInfo(s)?.name ?? s));
-  }
+  const applied = r.statuses.map((s) => statusInfo(s)?.name ?? s);
   if (r.destroyed) applied.push("DESTRUÍDO");
   const entry: RollResult = {
     id: uid(),
@@ -53,5 +50,11 @@ async function runCheck(id: string, kind: CheckKind, remaining: number, by: By) 
     trauma: r.trauma,
     notes: [`${kind === "structure" ? "Estrutura" : "Estresse"} restante: ${remaining}/${max}`],
   };
-  await publishRoll(entry);
+  // Dice first; the conditions from the check land once they stop.
+  const thrown = await throwDiceAndWait(entry);
+  if (r.statuses.length) {
+    const fresh = (await getRoomState()).combatants[c.id] ?? c;
+    await patchCombatant(c.id, { st: Array.from(new Set([...(fresh.st ?? []), ...r.statuses])) });
+  }
+  await publishRoll(entry, { thrown });
 }

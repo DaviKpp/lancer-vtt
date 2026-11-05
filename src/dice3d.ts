@@ -6,7 +6,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import type { DiceShow, ShownDie } from "./lib/diceShow";
 import { buildDieModel, numberTexture, STYLES, styleFromSet, type DieStyle } from "./lib/diceModels";
 import { sanitizeSet } from "./lib/diceSets";
-import { DICE_POPOVER_ID } from "./obr/dice";
+import { DICE_POPOVER_ID, DICE_SETTLED_CHANNEL } from "./obr/dice";
 
 const show: DiceShow | null = (() => {
   try {
@@ -256,6 +256,7 @@ function frame(now: number) {
   separate();
   renderer.render(scene, camera);
   const settled = t > ROLL_TIME + lastDelay;
+  if (settled) reportSettled();
   if (settled && !captionShown && captionAllowed) {
     captionShown = true;
     caption.classList.add("show");
@@ -264,7 +265,17 @@ function frame(now: number) {
   else close();
 }
 
+// Tell the roller's page the dice stopped, so it can reveal the result (log, notifications, effects).
+let inObr = false;
+let reported = false;
+function reportSettled() {
+  if (reported || !inObr || !show || !captionAllowed) return;
+  reported = true;
+  void OBR.broadcast.sendMessage(DICE_SETTLED_CHANNEL, { id: show.id }, { destination: "LOCAL" }).catch(() => undefined);
+}
+
 function close() {
+  reportSettled(); // closed early by a click: don't keep the result waiting
   void OBR.popover.close(DICE_POPOVER_ID);
 }
 
@@ -272,6 +283,7 @@ function close() {
 if (window.parent === window) requestAnimationFrame(frame);
 
 OBR.onReady(() => {
+  inObr = true;
   captionAllowed = !show?.byId || show.byId === OBR.player.id;
   document.body.addEventListener("click", close);
   if (!dice.length) close();
