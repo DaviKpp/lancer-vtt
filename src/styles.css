@@ -1045,7 +1045,29 @@ button.tag {
   color: var(--obr-text);
 }
 .attack-panel .form-grid {
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+/* keep the attack form inside the panel: inputs shrink instead of pushing past the edge */
+.attack-panel .form-grid > * {
+  min-width: 0;
+}
+.attack-panel .form-grid select,
+.attack-panel .form-grid input:not([type="checkbox"]) {
+  width: 100%;
+  min-width: 0;
+}
+.attack-panel .form-grid .row > select {
+  flex: 1 1 0;
+}
+.attack-panel .form-grid .row > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.attack-head {
+  gap: 6px;
+}
+.attack-head strong {
+  min-width: 0;
 }
 
 /* attributes, skill checks and quick editor in the encounter */

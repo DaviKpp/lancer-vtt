@@ -13,6 +13,7 @@ import { canView } from "./lib/combatant";
 import type { Sheet } from "./lib/types";
 import { applyDestroyed } from "./lib/destroyed";
 import { OPEN_CHANNEL } from "./obr/constants";
+import { removeLegacyTargetTool } from "./obr/targeting";
 import { useObrSession, useObrTheme, useParty, useRoomState, useSceneReady, useSheets, useTemplates } from "./obr/hooks";
 
 type Tab = "mechs" | "npcs" | "encounter" | "guide" | "rolls";
@@ -30,6 +31,11 @@ export function App() {
   const [tab, setTab] = useState<Tab>("mechs");
   const [openId, setOpenId] = useState<string | null>(null);
   const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
+
+  // Clean up the old "Escolher alvo" toolbar tool (left by an outdated background page).
+  useEffect(() => {
+    if (session.ready) void removeLegacyTargetTool();
+  }, [session.ready]);
 
   // The token context menu ("Abrir ficha LANCER") asks the popover to show a sheet.
   useEffect(() => {

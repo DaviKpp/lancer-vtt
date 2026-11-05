@@ -12,6 +12,23 @@ const ARROW_TTL = 3 * 60_000;
 
 type ArrowMsg = { attackerId: string; from?: string; to?: string };
 
+// ---------------------------------------------------------------- legacy tool
+
+/**
+ * An earlier version added an "Escolher alvo" tool to the toolbar. A background page that is still
+ * running that version keeps it registered, so remove it (and leave it if it's the active tool).
+ */
+export async function removeLegacyTargetTool() {
+  const tool = `${ID}/target-tool`;
+  try {
+    if ((await OBR.tool.getActiveTool()) === tool) await OBR.tool.activateTool("rodeo.owlbear.tool/move");
+  } catch {
+    // ignore
+  }
+  await OBR.tool.removeMode(`${ID}/target-mode`).catch(() => undefined);
+  await OBR.tool.remove(tool).catch(() => undefined);
+}
+
 // ---------------------------------------------------------------- popover side
 
 /** Shows (to everyone) an arrow from the attacker's token to the target's token. */
@@ -210,6 +227,7 @@ export function startTargeting() {
   };
 
   OBR.onReady(async () => {
+    void removeLegacyTargetTool();
     OBR.broadcast.onMessage(ARROW_CHANNEL, (e) => {
       const m = e.data as ArrowMsg;
       if (!m?.attackerId) return;
