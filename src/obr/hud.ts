@@ -5,7 +5,8 @@
 //   - Lancers (player mechs): everyone sees HP + conditions above the token and
 //     heat / structure / stress below it.
 //   - NPCs: the GM sees the same as above; players only see statuses and conditions.
-import OBR, { buildShape, buildText, type Item } from "@owlbear-rodeo/sdk";
+//   - Destroyed combatants (no structure left, or reactor meltdown) get a red X for everyone.
+import OBR, { buildPath, buildShape, buildText, Command, type Item, type PathCommand } from "@owlbear-rodeo/sdk";
 import type { CombatantState } from "../lib/types";
 import { activeStatuses, statusInfo } from "../lib/statuses";
 import { HUD_KEY } from "./constants";
@@ -38,7 +39,17 @@ interface TextSpec {
   align: "TOP" | "BOTTOM";
   z: number;
 }
-type Spec = RectSpec | TextSpec;
+interface PathSpec {
+  kind: "path";
+  id: string;
+  tokenId: string;
+  position: Vec;
+  commands: PathCommand[];
+  color: string;
+  strokeWidth: number;
+  z: number;
+}
+type Spec = RectSpec | TextSpec | PathSpec;
 
 const COLORS = {
   barBg: "#111318",
@@ -50,7 +61,32 @@ const COLORS = {
   condition: "#ff8a80", // conditions (Emperrado, Lento...) — red
   status: "#8ecbff", // statuses (Oculto, Exposto...) — blue
   outline: "#000000",
+  destroyed: "#e2382c",
 };
+
+export function isDestroyed(c: CombatantState) {
+  return c.structure <= 0 || (c.maxStress > 0 && c.stress <= 0);
+}
+
+/** Red X over the whole token (with a dark outline so it reads on any art). */
+function destroyedX(c: CombatantState, b: { min: Vec; max: Vec; width: number }, dpi: number): Spec[] {
+  const tokenId = c.tokenId as string;
+  const w = b.max.x - b.min.x;
+  const h = b.max.y - b.min.y;
+  const inset = Math.min(w, h) * 0.08;
+  const commands: PathCommand[] = [
+    [Command.MOVE, inset, inset],
+    [Command.LINE, w - inset, h - inset],
+    [Command.MOVE, w - inset, inset],
+    [Command.LINE, inset, h - inset],
+  ];
+  const stroke = Math.max(4, Math.min(w, h) * 0.1, dpi * 0.06);
+  const base = { kind: "path" as const, tokenId, position: b.min, commands };
+  return [
+    { ...base, id: `${HUD_KEY}/${tokenId}/x-outline`, color: COLORS.outline, strokeWidth: stroke * 1.5, z: 4 },
+    { ...base, id: `${HUD_KEY}/${tokenId}/x`, color: COLORS.destroyed, strokeWidth: stroke, z: 5 },
+  ];
+}
 
 function round(v: number) {
   return Math.round(v * 10) / 10;
@@ -67,7 +103,8 @@ function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, d
       .join(" · ");
   const conditions = names("Condition");
   const statuses = names("Status");
-  if (!showNumbers && !conditions && !statuses) return [];
+  const out: Spec[] = isDestroyed(c) ? destroyedX(c, b, dpi) : [];
+  if (!showNumbers && !conditions && !statuses) return out.map((s) => ({ ...s, position: { x: round(s.position.x), y: round(s.position.y) } }));
 
   const id = (part: string) => `${HUD_KEY}/${c.tokenId}/${part}`;
   const tokenId = c.tokenId as string;
@@ -78,7 +115,6 @@ function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, d
   const font = Math.max(10, dpi * 0.15);
   const lineH = font * 1.25;
   const textW = Math.max(w * 3, dpi * 3);
-  const out: Spec[] = [];
 
   // ---- above the token (stacking upwards) ----
   let y = b.min.y - gap;
@@ -188,6 +224,15 @@ function build(s: Spec): Item {
       .zIndex(s.z)
       .disableAttachmentBehavior(["ROTATION", "SCALE", "LOCKED", "COPY"])
       .metadata({ [HUD_KEY]: s.tokenId });
+  if (s.kind === "path") {
+    return common(buildPath())
+      .commands(s.commands)
+      .fillOpacity(0)
+      .strokeColor(s.color)
+      .strokeOpacity(1)
+      .strokeWidth(s.strokeWidth)
+      .build();
+  }
   if (s.kind === "rect") {
     return common(buildShape())
       .shapeType("RECTANGLE")
@@ -221,7 +266,11 @@ function build(s: Spec): Item {
 function applyTo(draft: any, s: Spec) {
   draft.position = s.position;
   draft.zIndex = s.z;
-  if (s.kind === "rect") {
+  if (s.kind === "path") {
+    draft.commands = s.commands;
+    draft.style.strokeWidth = s.strokeWidth;
+    draft.style.strokeColor = s.color;
+  } else if (s.kind === "rect") {
     draft.width = s.width;
     draft.height = s.height;
     draft.style.fillColor = s.color;

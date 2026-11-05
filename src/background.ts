@@ -2,6 +2,7 @@
 import OBR from "@owlbear-rodeo/sdk";
 import { startHud } from "./obr/hud";
 import { listenAnnouncements } from "./obr/announce";
+import { startTargeting } from "./obr/targeting";
 import { CONTEXT_LINK_ID, CONTEXT_OPEN_ID, LINK_KEY, LINK_MODAL_ID, OPEN_CHANNEL } from "./obr/constants";
 
 OBR.onReady(() => {
@@ -67,3 +68,6 @@ OBR.onReady(() => {
 
 // Bars / labels over linked tokens (drawn locally, per viewer).
 startHud();
+
+// "Escolher alvo" tool + attacker → target arrows (drawn locally, per viewer).
+startTargeting();
