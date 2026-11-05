@@ -1,4 +1,3 @@
-import OBR from "@owlbear-rodeo/sdk";
 import type { CombatantState } from "../lib/types";
 import { removeCombatant, setEncounter } from "../obr/room";
 import { sheetStore } from "../obr/sheets";
@@ -6,6 +5,7 @@ import { useApp } from "./AppContext";
 import { StatusChips } from "./Conditions";
 import { Portrait } from "./Portrait";
 import { imageFor } from "../lib/images";
+import { notify } from "../obr/toast";
 
 export function MiniBars({ c }: { c: CombatantState }) {
   const pct = (v: number, m: number) => `${Math.max(0, Math.min(100, (v / Math.max(m, 1)) * 100))}%`;
@@ -102,5 +102,5 @@ export function CombatantList({ list, empty }: { list: CombatantState[]; empty: 
 }
 
 export async function notifyMissingSheet(name: string) {
-  await OBR.notification.show(`A ficha de ${name} ainda não está neste dispositivo — aguardando o dono ficar online.`, "INFO");
+  await notify(`A ficha de ${name} ainda não está neste dispositivo — aguardando o dono ficar online.`, "INFO");
 }

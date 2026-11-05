@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import OBR from "@owlbear-rodeo/sdk";
 import type { CombatantState, RollResult, Sheet } from "../lib/types";
 import { tr } from "../lib/i18n";
 import { takeAction } from "../obr/actions";
@@ -9,6 +8,7 @@ import type { AttackSpec } from "./AttackPanel";
 import { mechWeaponSpec, npcFeatureSpec } from "./attackSpecs";
 import { useApp } from "./AppContext";
 import { RollCard } from "./RollLogView";
+import { notify } from "../obr/toast";
 
 interface MountGroup {
   key: string;
@@ -119,7 +119,7 @@ export function BarragePanel({
       }
       setResults(out);
     } catch (e) {
-      await OBR.notification.show((e as Error).message, "ERROR");
+      await notify((e as Error).message, "ERROR");
     } finally {
       setBusy(false);
     }

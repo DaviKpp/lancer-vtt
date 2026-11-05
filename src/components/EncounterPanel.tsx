@@ -23,6 +23,7 @@ import { BarragePanel } from "./BarragePanel";
 import { TurnTracker } from "./TurnTracker";
 import { endTurn, startTurn } from "../obr/turns";
 import { ReactionPanel } from "./ReactionPanel";
+import { notify } from "../obr/toast";
 
 export function EncounterPanel() {
   const app = useApp();
@@ -211,16 +212,16 @@ function EncounterRow({ c, active, onRemove }: { c: CombatantState; active: bool
   const linkSelected = async () => {
     const sel = await OBR.player.getSelection();
     if (!sel || sel.length !== 1) {
-      await OBR.notification.show("Selecione exatamente um token no mapa e clique em Vincular.", "WARNING");
+      await notify("Selecione exatamente um token no mapa e clique em Vincular.", "WARNING");
       return;
     }
     const [item] = await OBR.scene.items.getItems(sel);
     if (!item || (item.layer !== "CHARACTER" && item.layer !== "MOUNT")) {
-      await OBR.notification.show("Só tokens de personagem ou montaria podem ser vinculados.", "WARNING");
+      await notify("Só tokens de personagem ou montaria podem ser vinculados.", "WARNING");
       return;
     }
     await linkToken(c.id, item.id);
-    await OBR.notification.show(`${c.name} vinculado a ${item.name || "token"}.`, "SUCCESS");
+    await notify(`${c.name} vinculado a ${item.name || "token"}.`, "SUCCESS");
   };
 
   return (

@@ -4,6 +4,7 @@
 import OBR from "@owlbear-rodeo/sdk";
 import type { CombatantState } from "../lib/types";
 import { ANNOUNCE_CHANNEL } from "./constants";
+import { notify, pushToast } from "./toast";
 
 type Variant = "DEFAULT" | "ERROR" | "INFO" | "SUCCESS" | "WARNING";
 
@@ -21,7 +22,7 @@ export async function announce(
   opts: { subject?: CombatantState; publicMessage?: string } = {},
 ) {
   if (!message) return;
-  await OBR.notification.show(message, variant);
+  await notify(message, variant);
   const msg: Announcement = { message, variant };
   if (opts.subject) {
     msg.owner = opts.subject.owner;
@@ -52,6 +53,6 @@ export function listenAnnouncements() {
       const role = await OBR.player.getRole();
       if (role !== "GM" && a.owner !== OBR.player.id) text = a.publicMessage ?? "";
     }
-    if (text) await OBR.notification.show(text, a.variant);
+    if (text) pushToast(text, a.variant);
   });
 }

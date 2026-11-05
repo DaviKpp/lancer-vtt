@@ -1,5 +1,4 @@
 import { useState } from "react";
-import OBR from "@owlbear-rodeo/sdk";
 import type { NpcSheet } from "../lib/types";
 import { useTemplates } from "../obr/hooks";
 import { spawnFromTemplate } from "../obr/spawn";
@@ -9,6 +8,7 @@ import { ImportButton } from "./ImportButton";
 import { tr } from "../lib/i18n";
 import { ContentPacks } from "./ContentPacks";
 import { Portrait } from "./Portrait";
+import { notify } from "../obr/toast";
 
 export function TemplateList({ onOpen }: { onOpen: (id: string) => void }) {
   const templates = useTemplates();
@@ -43,9 +43,9 @@ export function SpawnControls({ t, compact }: { t: NpcSheet; compact?: boolean }
     try {
       const made = await spawnFromTemplate(t, count, { id: app.session.playerId, name: app.session.playerName });
       setCount(1);
-      await OBR.notification.show(`${made.map((m) => m.name).join(", ")} adicionado(s) a ${enc?.name}.`, "SUCCESS");
+      await notify(`${made.map((m) => m.name).join(", ")} adicionado(s) a ${enc?.name}.`, "SUCCESS");
     } catch (e) {
-      await OBR.notification.show((e as Error).message, "ERROR");
+      await notify((e as Error).message, "ERROR");
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import OBR from "@owlbear-rodeo/sdk";
 import type { ParsedNpc, ParsedPilot } from "../parsers";
 import { combatantFromMech } from "../lib/combatant";
 import { templateStore } from "../obr/templates";
@@ -7,6 +6,7 @@ import type { CombatantState, Sheet } from "../lib/types";
 import { putCombatant } from "../obr/room";
 import { sheetStore } from "../obr/sheets";
 import { useApp } from "./AppContext";
+import { notify } from "../obr/toast";
 
 export async function addToRoom(sheet: Sheet, state: CombatantState) {
   // Room entry first so other clients accept the sheet when it arrives.
@@ -79,7 +79,7 @@ export function ImportButton({ mode }: { mode: "mech" | "npc" }) {
       const templates = pending.npcs.filter((n) => pending.selected.has(n.sheet.id)).map((n) => n.sheet);
       if (templates.length) templateStore.add(templates);
       count += templates.length;
-      await OBR.notification.show(
+      await notify(
         templates.length && count === templates.length
           ? `${count} template${count === 1 ? "" : "s"} de NPC salvo${count === 1 ? "" : "s"}.`
           : `${count} ${count === 1 ? "item importado" : "itens importados"}.`,

@@ -1,8 +1,8 @@
 import { useRef, useState, useSyncExternalStore } from "react";
-import OBR from "@owlbear-rodeo/sdk";
 import { lcpStore } from "../lib/lcp";
 import { templateStore } from "../obr/templates";
 import { Section } from "./common";
+import { notify } from "../obr/toast";
 
 const PACK_LABEL: Record<string, string> = {
   npc_classes: "classes de NPC",
@@ -49,10 +49,10 @@ export function ContentPacks() {
       for (const f of Array.from(files)) {
         const pack = await lcpStore.importFile(f);
         const n = Object.values(pack.counts).reduce((a, b) => a + (b ?? 0), 0);
-        await OBR.notification.show(`${pack.name} carregado (${n} itens).`, "SUCCESS");
+        await notify(`${pack.name} carregado (${n} itens).`, "SUCCESS");
       }
       const fixed = await reparseTemplates();
-      if (fixed) await OBR.notification.show(`${fixed} template(s) atualizado(s) com os novos dados.`, "SUCCESS");
+      if (fixed) await notify(`${fixed} template(s) atualizado(s) com os novos dados.`, "SUCCESS");
     } catch (e) {
       setError((e as Error).message);
     } finally {

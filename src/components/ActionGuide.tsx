@@ -1,5 +1,4 @@
 import { useState } from "react";
-import OBR from "@owlbear-rodeo/sdk";
 import type { CombatantState, Sheet } from "../lib/types";
 import { GUIDE, TURN_RULES, type GuideAction } from "../lib/actionGuide";
 import { blockedReason, COST_LABEL, overchargeCost } from "../lib/actions";
@@ -14,6 +13,7 @@ import { AttackPanel, type AttackSpec } from "./AttackPanel";
 import { mechWeaponSpec, npcFeatureSpec, techSpec } from "./attackSpecs";
 import { useApp } from "./AppContext";
 import { BarragePanel } from "./BarragePanel";
+import { notify } from "../obr/toast";
 
 type Mode =
   | { kind: "weapons"; title: string; free: boolean; filter: "noSuperheavy" | "all" }
@@ -96,7 +96,7 @@ export function ActionGuide({ c, sheet, editable }: { c?: CombatantState; sheet?
       }
       case "overcharge": {
         const fresh = (await getRoomState()).combatants[c.id] ?? c;
-        if (fresh.ac?.o) await OBR.notification.show(`${fresh.name} já usou Sobrecarga neste turno.`, "WARNING");
+        if (fresh.ac?.o) await notify(`${fresh.name} já usou Sobrecarga neste turno.`, "WARNING");
         const uses = fresh.ocn ?? 0;
         const roll = rollExpression(overchargeCost(uses));
         const heat = applyHeat(fresh, roll.total);
@@ -256,7 +256,7 @@ function Stabilize({ c, onDone }: { c: CombatantState; onDone: () => void }) {
       notes.push("resfriou (calor zerado, sem Exposto)");
     } else {
       if (fresh.kind === "mech" && fresh.repairs <= 0)
-        await OBR.notification.show(`${fresh.name} não tem Reparos sobrando.`, "WARNING");
+        await notify(`${fresh.name} não tem Reparos sobrando.`, "WARNING");
       patch.hp = fresh.maxHp;
       if (fresh.kind === "mech") patch.repairs = Math.max(0, fresh.repairs - 1);
       notes.push("gastou 1 Reparo (PV cheio)");

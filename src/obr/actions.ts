@@ -1,4 +1,3 @@
-import OBR from "@owlbear-rodeo/sdk";
 import type { CombatantState, RollResult } from "../lib/types";
 import { blockedReason, COST_LABEL, spend, type ActionCost } from "../lib/actions";
 import { reactionBlocked, spendReaction, type ReactionDef } from "../lib/reactions";
@@ -7,6 +6,7 @@ import { getRoomState, patchCombatant } from "./room";
 import { publishRoll } from "./rolls";
 import { startTurn } from "./turns";
 import { announce } from "./announce";
+import { notify } from "./toast";
 
 type By = { id: string; name: string };
 
@@ -58,7 +58,7 @@ export async function takeAction(
   }
   const fresh = combatants[c.id] ?? c;
   const blocked = blockedReason(fresh, cost, encounter?.tk ?? 0);
-  if (blocked) await OBR.notification.show(`${fresh.name}: ${blocked}.`, "WARNING");
+  if (blocked) await notify(`${fresh.name}: ${blocked}.`, "WARNING");
   if (cost !== "none" && cost !== "free" && cost !== "protocol") await patchCombatant(c.id, { ac: spend(fresh.ac, cost) });
   if (opts.log === false) return;
   await log(fresh, `${label}${COST_LABEL[cost] ? ` (${COST_LABEL[cost]})` : ""}`, by, opts.detail);
@@ -70,7 +70,7 @@ export async function useReaction(c: CombatantState, def: ReactionDef, by: By, o
   const fresh = combatants[c.id] ?? c;
   const tk = encounter?.tk ?? 0;
   const blocked = reactionBlocked(fresh, def, tk);
-  if (blocked) await OBR.notification.show(`${fresh.name}: ${blocked}.`, "WARNING");
+  if (blocked) await notify(`${fresh.name}: ${blocked}.`, "WARNING");
   await patchCombatant(c.id, spendReaction(fresh, def, tk));
   if (opts.log === false) return;
   await log(fresh, `${def.name} (Reação)`, by, opts.detail);

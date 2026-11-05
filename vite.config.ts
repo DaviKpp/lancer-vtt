@@ -20,6 +20,8 @@ export default defineConfig({
         link: resolve(__dirname, "link.html"),
         // Transparent popover with the 3D dice thrown by players
         dice: resolve(__dirname, "dice.html"),
+        // Transparent popover with the extension's notifications
+        toast: resolve(__dirname, "toast.html"),
       },
     },
   },

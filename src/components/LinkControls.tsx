@@ -3,6 +3,7 @@ import OBR, { type Item } from "@owlbear-rodeo/sdk";
 import type { CombatantState } from "../lib/types";
 import { linkToken, unlinkToken } from "../obr/room";
 import { useApp } from "./AppContext";
+import { notify } from "../obr/toast";
 
 /** Shows the token link for a combatant and lets its owner (or the GM) link the selected token. */
 export function LinkControls({ c, editable }: { c: CombatantState; editable: boolean }) {
@@ -28,16 +29,16 @@ export function LinkControls({ c, editable }: { c: CombatantState; editable: boo
   const linkSelected = async () => {
     const sel = await OBR.player.getSelection();
     if (!sel || sel.length !== 1) {
-      await OBR.notification.show("Selecione exatamente um token no mapa e clique em Vincular.", "WARNING");
+      await notify("Selecione exatamente um token no mapa e clique em Vincular.", "WARNING");
       return;
     }
     const [item] = await OBR.scene.items.getItems(sel);
     if (!item || (item.layer !== "CHARACTER" && item.layer !== "MOUNT")) {
-      await OBR.notification.show("Só tokens de personagem ou montaria podem ser vinculados.", "WARNING");
+      await notify("Só tokens de personagem ou montaria podem ser vinculados.", "WARNING");
       return;
     }
     await linkToken(c.id, item.id);
-    await OBR.notification.show(`${c.name} vinculado a ${item.name || "token"}.`, "SUCCESS");
+    await notify(`${c.name} vinculado a ${item.name || "token"}.`, "SUCCESS");
   };
 
   return (

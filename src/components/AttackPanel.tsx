@@ -12,6 +12,7 @@ import type { StatusEffect } from "../lib/types";
 import { statusInfo } from "../lib/statuses";
 import { Html } from "./Html";
 import { clearArrow, showArrow } from "../obr/targeting";
+import { notify } from "../obr/toast";
 
 export interface AttackSpec {
   kind: "attack" | "tech";
@@ -89,7 +90,7 @@ export function AttackPanel({
     const tokenId = sel?.[0];
     const match = Object.values(app.room.combatants).find((c) => c.tokenId && c.tokenId === tokenId);
     if (match && match.id !== attacker.id) setTargetId(match.id);
-    else void OBR.notification.show("Selecione primeiro um token vinculado a um combatente LANCER.", "WARNING");
+    else void notify("Selecione primeiro um token vinculado a um combatente LANCER.", "WARNING");
   };
 
   // Arrow from the attacker to the chosen target, shown to everyone while this panel is open.

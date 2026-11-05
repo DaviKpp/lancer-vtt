@@ -7,6 +7,7 @@ import { getRoomState, linkToken, unlinkToken } from "./obr/room";
 import type { CombatantState } from "./lib/types";
 import { useObrTheme } from "./obr/hooks";
 import "./styles.css";
+import { notify } from "./obr/toast";
 
 function LinkModal() {
   const itemId = new URLSearchParams(location.search).get("item") ?? "";
@@ -41,7 +42,7 @@ function LinkModal() {
 
   const choose = async (c: CombatantState) => {
     await linkToken(c.id, itemId);
-    await OBR.notification.show(`${item?.name || "Token"} vinculado a ${c.name}.`, "SUCCESS");
+    await notify(`${item?.name || "Token"} vinculado a ${c.name}.`, "SUCCESS");
     await close();
   };
 
