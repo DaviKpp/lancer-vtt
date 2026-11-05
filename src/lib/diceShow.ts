@@ -1,5 +1,6 @@
 // Turns a roll into the list of physical dice to animate on everyone's screen.
 import type { RollResult } from "./types";
+import type { DiceSet } from "./diceSets";
 
 const OUTCOME_PT = { hit: "ACERTO", miss: "ERRO", crit: "CRÍTICO" } as const;
 
@@ -19,6 +20,8 @@ export interface DiceShow {
   label: string; // weapon / check name
   result: string; // "18 — ACERTO · 7 de dano"
   dice: ShownDie[];
+  /** The roller's chosen colors for the d20 and damage dice. */
+  set?: DiceSet;
 }
 
 /** Dice inside a detail string like "2d6[3,5] + 2" or, on a crit, "1d6[2|5]". */

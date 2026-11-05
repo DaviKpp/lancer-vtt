@@ -1186,3 +1186,69 @@ button.tag {
   align-items: center;
   gap: 6px;
 }
+
+/* dice set picker */
+.dice-picker {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dice-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+.dice-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.dice-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 6px;
+}
+.dice-preset {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  min-width: 0;
+}
+.dice-preset .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dice-preset.active {
+  border-color: var(--obr-primary);
+  background: rgba(187, 153, 255, 0.12);
+}
+.dice-custom {
+  grid-template-columns: 78px minmax(0, 1fr);
+}
+.dice-custom input[type="color"] {
+  width: 56px;
+  height: 28px;
+  padding: 2px;
+}

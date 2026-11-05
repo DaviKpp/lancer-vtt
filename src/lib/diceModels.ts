@@ -2,6 +2,7 @@
 // (Style inspired by the Owlbear Rodeo dice; everything here is generated in code.)
 import * as THREE from "three";
 import type { DieTone } from "./diceShow";
+import { isLight, shade, type DiceSet } from "./diceSets";
 
 export interface DieFace {
   normal: THREE.Vector3;
@@ -196,7 +197,7 @@ export function buildDieModel(sides: number): DieModel {
         const line = new THREE.Line3(ring[i], ring[(i + 1) % ring.length]);
         inr = Math.min(inr, line.closestPointToPoint(f.center, true, new THREE.Vector3()).distanceTo(f.center));
       }
-      return { normal: f.normal, center: f.center, label: labels[fi], labelSize: inr * (ring.length === 3 ? 1.35 : 1.45) };
+      return { normal: f.normal, center: f.center, label: labels[fi], labelSize: inr * (ring.length === 3 ? 1.6 : 1.6) };
     }),
   };
 }
@@ -278,6 +279,62 @@ export interface DieStyle {
   inkShadow: string;
 }
 
+function rgba(hex: string, a: number) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/** A player's dice set (material + colors) as a die style. */
+export function styleFromSet(set: DiceSet): DieStyle {
+  const seed = parseInt(set.body.slice(1), 16) % 1000;
+  const dark = shade(set.body, -0.5);
+  const body = (): THREE.MeshPhysicalMaterial => {
+    switch (set.material) {
+      case "gema":
+        return new THREE.MeshPhysicalMaterial({
+          // "gem": glossy with an inner glow (real transmission renders unreliably on a transparent canvas)
+          map: canvasTexture(clouds(set.body, [rgba(set.accent, 0.35), rgba(dark, 0.5)], 40), seed),
+          emissive: new THREE.Color(shade(set.body, -0.3)),
+          emissiveIntensity: 0.6,
+          roughness: 0.1,
+          clearcoat: 1,
+          clearcoatRoughness: 0.4,
+        });
+      case "metal":
+        return new THREE.MeshPhysicalMaterial({
+          map: canvasTexture(brushed(set.body), seed),
+          metalness: 0.9,
+          roughness: 0.45,
+        });
+      case "nebulosa":
+        return new THREE.MeshPhysicalMaterial({
+          map: canvasTexture(
+            both(clouds(set.body, [rgba(set.accent, 0.55), rgba(shade(set.accent, 0.35), 0.35), rgba(dark, 0.5)]), sparkles(140)),
+            seed,
+          ),
+          roughness: 0.3,
+          clearcoat: 1,
+          clearcoatRoughness: 0.4,
+        });
+      case "pedra":
+        return new THREE.MeshPhysicalMaterial({
+          map: canvasTexture(both(clouds(set.body, [rgba(set.accent, 0.6), rgba(dark, 0.7)]), sparkles(260)), seed),
+          roughness: 0.45,
+          clearcoat: 0.6,
+          clearcoatRoughness: 0.3,
+        });
+      default:
+        return new THREE.MeshPhysicalMaterial({
+          map: canvasTexture(clouds(set.body, [rgba(set.accent, 0.8), rgba(shade(set.accent, 0.3), 0.5), rgba(dark, 0.8)]), seed),
+          roughness: 0.4,
+          clearcoat: 0.8,
+          clearcoatRoughness: 0.4,
+        });
+    }
+  };
+  return { body, ink: set.ink, inkShadow: isLight(set.ink) ? "rgba(0,0,0,0.85)" : "rgba(255,255,255,0.5)" };
+}
+
 /** One style per kind of die. */
 export const STYLES: Record<DieTone, DieStyle> = {
   // d20: red/orange "sunset" with a glossy coat
@@ -287,23 +344,21 @@ export const STYLES: Record<DieTone, DieStyle> = {
         map: canvasTexture(clouds("#8e1414", ["rgba(226,56,44,0.9)", "rgba(255,120,40,0.6)", "rgba(90,0,10,0.8)"]), 11),
         roughness: 0.4,
         clearcoat: 0.8,
-        clearcoatRoughness: 0.25,
+        clearcoatRoughness: 0.4,
       }),
     ink: "#ffffff",
     inkShadow: "rgba(40,0,0,0.9)",
   },
-  // accuracy: translucent green gemstone
+  // accuracy: glossy green gemstone
   acc: {
     body: () =>
       new THREE.MeshPhysicalMaterial({
-        color: 0x2fbf86,
         map: canvasTexture(clouds("#1d8f63", ["rgba(120,255,200,0.35)", "rgba(0,80,50,0.5)"], 40), 23),
-        roughness: 0.08,
-        transmission: 0.55,
-        thickness: 1.2,
-        ior: 1.6,
+        emissive: new THREE.Color("#0f5a3c"),
+        emissiveIntensity: 0.6,
+        roughness: 0.1,
         clearcoat: 1,
-        clearcoatRoughness: 0.05,
+        clearcoatRoughness: 0.4,
       }),
     ink: "#ffffff",
     inkShadow: "rgba(0,40,25,0.9)",
@@ -318,7 +373,7 @@ export const STYLES: Record<DieTone, DieStyle> = {
         ),
         roughness: 0.3,
         clearcoat: 1,
-        clearcoatRoughness: 0.2,
+        clearcoatRoughness: 0.4,
       }),
     ink: "#ff9aa8",
     inkShadow: "rgba(0,0,0,0.9)",
@@ -359,17 +414,17 @@ export function numberTexture(n: number, style: DieStyle): THREE.Texture {
   const cv = document.createElement("canvas");
   cv.width = cv.height = s;
   const g = cv.getContext("2d")!;
-  g.font = `600 ${n >= 10 ? 58 : 72}px "Roboto", "Segoe UI", system-ui, sans-serif`;
+  g.font = `700 ${n >= 10 ? 80 : 100}px "Roboto", "Segoe UI", system-ui, sans-serif`;
   g.textAlign = "center";
   g.textBaseline = "middle";
   const y = s / 2 + 3;
   g.fillStyle = style.inkShadow;
   g.filter = "blur(1.5px)";
-  g.fillText(String(n), s / 2 + 2, y + 2);
+  g.fillText(String(n), s / 2 + 3, y + 3);
   g.filter = "none";
   g.fillStyle = style.ink;
   g.fillText(String(n), s / 2, y);
-  if (n === 6 || n === 9) g.fillRect(s * 0.38, s * 0.82, s * 0.24, s * 0.045);
+  if (n === 6 || n === 9) g.fillRect(s * 0.34, s * 0.88, s * 0.32, s * 0.05);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
