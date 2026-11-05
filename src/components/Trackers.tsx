@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import type { CombatantState } from "../lib/types";
 import { applyDamage, applyHeat, fullRepair } from "../lib/rules";
 import { clamp } from "../lib/util";
-import OBR from "@owlbear-rodeo/sdk";
 import { patchWithChecks } from "../obr/checks";
+import { announce, publicLog } from "../obr/announce";
 import { useApp } from "./AppContext";
 
 type Key = "hp" | "os" | "heat" | "structure" | "stress" | "burn" | "repairs";
@@ -49,7 +49,7 @@ export function Trackers({
     if (r.key === "heat" && next > c.heatcap && c.heatcap > 0) {
       const out = applyHeat(c, delta);
       checked(out.patch);
-      void OBR.notification.show(out.log.join(" · "), "WARNING");
+      void announce(out.log.join(" · "), "WARNING", { subject: c, publicMessage: publicLog(out.log) });
       return;
     }
     if ((r.key === "structure" || r.key === "stress") && delta < 0) checked({ [r.key]: next });
@@ -181,7 +181,11 @@ export function DamageInput({ c, onPatch }: { c: CombatantState; onPatch: (p: Pa
           const out = applyDamage(c, amount, { ap, type, halve: resist });
           // Burn also gets marked on the sheet (it hurts again at the end of each turn).
           onPatch(type === "Burn" ? { ...out.patch, burn: c.burn + amount } : out.patch);
-          void OBR.notification.show(out.log.join(" · "), out.patch.structure !== c.structure || out.patch.stress !== undefined ? "WARNING" : "INFO");
+          void announce(
+            out.log.join(" · "),
+            out.patch.structure !== c.structure || out.patch.stress !== undefined ? "WARNING" : "INFO",
+            { subject: c, publicMessage: publicLog(out.log) },
+          );
           setAmount(0);
         }}
       >

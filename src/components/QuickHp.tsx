@@ -1,10 +1,10 @@
 import { useState } from "react";
-import OBR from "@owlbear-rodeo/sdk";
 import type { CombatantState } from "../lib/types";
 import { applyDamage, applyHeat } from "../lib/rules";
 import { clamp } from "../lib/util";
 import { patchCombatant } from "../obr/room";
 import { patchWithChecks } from "../obr/checks";
+import { announce, publicLog } from "../obr/announce";
 import { NumberField } from "./Trackers";
 import { useApp } from "./AppContext";
 
@@ -29,7 +29,7 @@ export function QuickHp({ c }: { c: CombatantState }) {
     const max = c[ROWS.find((r) => r.key === key)!.max] as number;
     if (key === "heat" && delta > 0) {
       const out = applyHeat(c, delta);
-      if (out.log.length > 1) void OBR.notification.show(out.log.join(" · "), "WARNING");
+      if (out.log.length > 1) void announce(out.log.join(" · "), "WARNING", { subject: c, publicMessage: publicLog(out.log) });
       return patchWithChecks(c, out.patch, by);
     }
     const next = clamp((c[key] as number) + delta, 0, max);
@@ -41,7 +41,10 @@ export function QuickHp({ c }: { c: CombatantState }) {
     if (amount <= 0) return;
     const hp = Math.min(c.maxHp, c.hp + amount);
     await patchCombatant(c.id, { hp });
-    await OBR.notification.show(`${c.name} recupera ${hp - c.hp} PV (${hp}/${c.maxHp}).`, "SUCCESS");
+    await announce(`${c.name} recupera ${hp - c.hp} PV (${hp}/${c.maxHp}).`, "SUCCESS", {
+      subject: c,
+      publicMessage: `${c.name} recupera ${hp - c.hp} PV.`,
+    });
     setAmount(0);
   };
 
@@ -49,7 +52,7 @@ export function QuickHp({ c }: { c: CombatantState }) {
     if (amount <= 0) return;
     const out = applyDamage(c, amount, {});
     await patchWithChecks(c, out.patch, by);
-    await OBR.notification.show(out.log.join(" · "), out.patch.structure !== c.structure ? "WARNING" : "INFO");
+    await announce(out.log.join(" · "), out.patch.structure !== c.structure ? "WARNING" : "INFO", { subject: c, publicMessage: publicLog(out.log) });
     setAmount(0);
   };
 

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import OBR from "@owlbear-rodeo/sdk";
 import { Html } from "./Html";
 import { TraumaChooser } from "./TraumaChooser";
 import { applyPending } from "../obr/effects";
 import { patchWithChecks } from "../obr/checks";
+import { announce, publicLog } from "../obr/announce";
 import { statusInfo } from "../lib/statuses";
 import type { RollResult } from "../lib/types";
 import { applyDamage } from "../lib/rules";
@@ -42,7 +42,10 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
     rollLog.markApplied(r.id);
     setAppliedHere(true); // hide the buttons right away (no double apply)
     onApplied?.();
-    await OBR.notification.show(log.join(" · "), state.structure < target.structure ? "WARNING" : "INFO");
+    await announce(log.join(" · "), state.structure < target.structure ? "WARNING" : "INFO", {
+      subject: target,
+      publicMessage: publicLog(log),
+    });
   };
 
   if (r.kind === "skill") {

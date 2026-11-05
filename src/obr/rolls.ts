@@ -4,6 +4,7 @@ import type { CombatantState, DamageEntry, RollResult } from "../lib/types";
 import { rollAccuracy, rollDie, rollExpression } from "../lib/dice";
 import { uid } from "../lib/util";
 import { ROLL_CHANNEL } from "./constants";
+import { announce } from "./announce";
 import { tr } from "../lib/i18n";
 
 const MAX_LOG = 60;
@@ -71,23 +72,23 @@ export async function publishRoll(r: RollResult) {
   rollLog.add(r);
   await OBR.broadcast.sendMessage(ROLL_CHANNEL, r, { destination: "REMOTE" });
   if (r.kind === "skill") {
-    await OBR.notification.show(
+    await announce(
       `${r.attackerName}: ${r.label} ${r.total} (alvo ${r.defense}) — ${r.outcome === "hit" ? "SUCESSO" : "FALHA"}`,
       r.outcome === "hit" ? "SUCCESS" : "WARNING",
     );
     return;
   }
   if (r.kind === "check") {
-    await OBR.notification.show(`${r.attackerName}: ${r.label} (menor ${r.total})${r.applied?.length ? ` — ${r.applied.join(", ")}` : ""}`, "WARNING");
+    await announce(`${r.attackerName}: ${r.label} (menor ${r.total})${r.applied?.length ? ` — ${r.applied.join(", ")}` : ""}`, "WARNING");
     return;
   }
   if (r.kind === "action") {
-    await OBR.notification.show(`${r.attackerName}: ${r.label}${r.notes?.length ? ` — ${r.notes.join(" · ")}` : ""}`, "INFO");
+    await announce(`${r.attackerName}: ${r.label}${r.notes?.length ? ` — ${r.notes.join(" · ")}` : ""}`, "INFO");
     return;
   }
   const outcome = r.outcome ? ` — ${OUTCOME_PT[r.outcome]}` : "";
   const dmg = r.damage?.length ? ` (${r.damage.map((d) => `${d.amount} ${tr(d.type)}`).join(", ")})` : "";
-  await OBR.notification.show(
+  await announce(
     `${r.attackerName}: ${r.label} ${r.total}${r.targetName ? ` contra ${r.targetName}` : ""}${outcome}${dmg}`,
     r.outcome === "miss" ? "WARNING" : r.outcome ? "SUCCESS" : "INFO",
   );

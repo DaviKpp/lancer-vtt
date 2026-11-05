@@ -12,6 +12,7 @@ export const LINK_KEY = `${ID}/link`;
 export const SHEET_CHANNEL = `${ID}/sheets`;
 export const ROLL_CHANNEL = `${ID}/roll`;
 export const OPEN_CHANNEL = `${ID}/open`;
+export const ANNOUNCE_CHANNEL = `${ID}/announce`;
 
 export const CONTEXT_LINK_ID = `${ID}/context-link`;
 export const CONTEXT_OPEN_ID = `${ID}/context-open`;

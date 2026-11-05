@@ -1,9 +1,13 @@
 // Background page: registers the token context-menu entries.
 import OBR from "@owlbear-rodeo/sdk";
 import { startHud } from "./obr/hud";
+import { listenAnnouncements } from "./obr/announce";
 import { CONTEXT_LINK_ID, CONTEXT_OPEN_ID, LINK_KEY, LINK_MODAL_ID, OPEN_CHANNEL } from "./obr/constants";
 
 OBR.onReady(() => {
+  // Damage / turn / roll announcements sent by other players.
+  listenAnnouncements();
+
   // "Link LANCER sheet" on any single character/mount token.
   OBR.contextMenu.create({
     id: CONTEXT_LINK_ID,

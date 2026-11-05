@@ -6,6 +6,7 @@ import { uid } from "../lib/util";
 import { getRoomState, patchCombatant } from "./room";
 import { publishRoll } from "./rolls";
 import { startTurn } from "./turns";
+import { announce } from "./announce";
 
 type By = { id: string; name: string };
 
@@ -52,7 +53,7 @@ export async function takeAction(
     encounter.actor !== c.id
   ) {
     await startTurn(c.id);
-    await OBR.notification.show(`Turno de ${c.name}.`, "INFO");
+    await announce(`Turno de ${c.name}.`, "INFO");
     ({ combatants, encounter } = await getRoomState());
   }
   const fresh = combatants[c.id] ?? c;
