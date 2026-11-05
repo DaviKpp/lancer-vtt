@@ -68,19 +68,24 @@ export function isDestroyed(c: CombatantState) {
   return c.structure <= 0 || (c.maxStress > 0 && c.stress <= 0);
 }
 
-/** Red X over the whole token (with a dark outline so it reads on any art). */
-function destroyedX(c: CombatantState, b: { min: Vec; max: Vec; width: number }, dpi: number): Spec[] {
+/** Red X in the middle of the token (with a dark outline so it reads on any art). */
+function destroyedX(c: CombatantState, b: { min: Vec; max: Vec; width: number }): Spec[] {
   const tokenId = c.tokenId as string;
   const w = b.max.x - b.min.x;
   const h = b.max.y - b.min.y;
-  const inset = Math.min(w, h) * 0.08;
+  // a square in the middle of the token, half its size, so the X stays inside the token's art
+  // (the stroke's half-width included)
+  const size = Math.min(w, h) * 0.5;
+  const stroke = Math.max(3, size * 0.14);
+  const r = size / 2 - stroke * 0.75;
+  const cx = w / 2;
+  const cy = h / 2;
   const commands: PathCommand[] = [
-    [Command.MOVE, inset, inset],
-    [Command.LINE, w - inset, h - inset],
-    [Command.MOVE, w - inset, inset],
-    [Command.LINE, inset, h - inset],
+    [Command.MOVE, cx - r, cy - r],
+    [Command.LINE, cx + r, cy + r],
+    [Command.MOVE, cx + r, cy - r],
+    [Command.LINE, cx - r, cy + r],
   ];
-  const stroke = Math.max(4, Math.min(w, h) * 0.1, dpi * 0.06);
   const base = { kind: "path" as const, tokenId, position: b.min, commands };
   return [
     { ...base, id: `${HUD_KEY}/${tokenId}/x-outline`, color: COLORS.outline, strokeWidth: stroke * 1.5, z: 4 },
@@ -94,7 +99,8 @@ function round(v: number) {
 
 /** Builds the HUD pieces for one token. `b` is the token's bounding box. */
 function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, dpi: number, role: Role): Spec[] {
-  const showNumbers = c.kind === "mech" || role === "GM";
+  // lancers and their pilots are open to everyone; NPC numbers only to the GM
+  const showNumbers = c.kind !== "npc" || role === "GM";
   const active = activeStatuses(c).map((sid) => statusInfo(sid));
   const names = (type: "Status" | "Condition") =>
     active
@@ -102,8 +108,9 @@ function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, d
       .map((x) => x!.name)
       .join(" · ");
   const conditions = names("Condition");
-  const statuses = names("Status");
-  const out: Spec[] = isDestroyed(c) ? destroyedX(c, b, dpi) : [];
+  // an empty mech (pilot dismounted) says so, with the statuses
+  const statuses = [c.dm ? "Sem piloto" : "", names("Status")].filter(Boolean).join(" · ");
+  const out: Spec[] = isDestroyed(c) ? destroyedX(c, b) : [];
   if (!showNumbers && !conditions && !statuses) return out.map((s) => ({ ...s, position: { x: round(s.position.x), y: round(s.position.y) } }));
 
   const id = (part: string) => `${HUD_KEY}/${c.tokenId}/${part}`;
@@ -181,8 +188,8 @@ function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, d
   if (conditions) line("conditions", conditions, COLORS.condition);
   if (statuses) line("statuses", statuses, COLORS.status);
 
-  // ---- below the token ----
-  if (showNumbers) {
+  // ---- below the token (pilots have no heat / structure / stress) ----
+  if (showNumbers && c.kind !== "pilot") {
     let by = b.max.y + gap;
     const heatRatio = Math.max(0, Math.min(1, c.heat / Math.max(1, c.heatcap)));
     if (c.heatcap > 0) {

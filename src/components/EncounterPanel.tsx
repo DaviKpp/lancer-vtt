@@ -10,6 +10,7 @@ import { QuickHp } from "./QuickHp";
 import { StatLine } from "./StatLine";
 import { Portrait } from "./Portrait";
 import { imageFor } from "../lib/images";
+import { pilotIdFor } from "../lib/pilot";
 import { SkillChecks } from "./SkillChecks";
 import { StatusChips } from "./Conditions";
 import { SpawnControls } from "./TemplateList";
@@ -243,6 +244,7 @@ function EncounterRow({ c, active, onRemove }: { c: CombatantState; active: bool
           {editable && <QuickHp c={c} />}
           {visible && sheet && <SkillChecks c={c} sheet={sheet} editable={editable} />}
           <StatusChips c={c} />
+          {c.dm && <DismountedPilot mechId={c.id} />}
           {visible && active && <TurnTracker c={c} editable={editable} compact />}
           {!visible && c.structure === 0 && <span className="badge badge-off">Destruído</span>}
         </div>
@@ -423,6 +425,27 @@ function AddFromTemplate() {
         ))}
       </select>
       {t && <SpawnControls key={t.id} t={t} />}
+    </div>
+  );
+}
+
+/** Mech row: its pilot is out of the mech (HP and a shortcut to the pilot's sheet). */
+function DismountedPilot({ mechId }: { mechId: string }) {
+  const app = useApp();
+  const pilot = app.room.combatants[pilotIdFor(mechId)];
+  if (!pilot) return <span className="badge badge-off">Sem piloto</span>;
+  const visible = canView(pilot, app.session);
+  return (
+    <div className="dismounted-pilot">
+      <span className="badge badge-off">Sem piloto</span>
+      <button className="link-btn" onClick={() => visible && app.openSheet(pilot.id)} disabled={!visible}>
+        🧍 {pilot.name}
+        {pilot.tokenId ? " ⛓" : ""}
+      </button>
+      <span className="muted small">
+        {visible ? `PV ${pilot.hp}/${pilot.maxHp}` : ""}
+        {pilot.hp <= 0 ? " · Abatido" : ""}
+      </span>
     </div>
   );
 }

@@ -196,7 +196,7 @@ function parsePilotInfo(p: any, warnings: string[], bonuses: Bonus[]): PilotInfo
     return {
       name: d?.name ?? prettifyId(t.id),
       rank,
-      ranks: ranks.map((r: any) => ({ name: r.name, description: toText(r.description) ?? "" })),
+      ranks: ranks.map((r: any) => ({ name: r.name, description: toText(r.description) ?? "", actions: parseActions(r.actions) })),
     };
   });
 
@@ -215,6 +215,7 @@ function parsePilotInfo(p: any, warnings: string[], bonuses: Bonus[]): PilotInfo
   // Pilot gear: v3 has loadouts[active_index], v2 has loadout.
   const pl = Array.isArray(p.loadouts) ? p.loadouts[num(p.active_index, 0)] ?? p.loadouts[0] : p.loadout;
   const gear: string[] = [];
+  const weapons: SheetWeapon[] = [];
   const pilotBonuses: Bonus[] = [];
   for (const group of ["armor", "weapons", "gear"]) {
     for (const g of pl?.[group] ?? []) {
@@ -222,6 +223,7 @@ function parsePilotInfo(p: any, warnings: string[], bonuses: Bonus[]): PilotInfo
       const d = g.data?.name ? g.data : lookup("pilotGear", g.id);
       gear.push(g.flavorName || d?.name || prettifyId(g.id));
       collectBonuses(d, pilotBonuses);
+      if (group === "weapons" && d && (d.damage?.length || d.range?.length)) weapons.push(pilotWeapon(g, d));
     }
   }
 
@@ -265,6 +267,39 @@ function parsePilotInfo(p: any, warnings: string[], bonuses: Bonus[]): PilotInfo
     coreBonuses,
     licenses,
     gear,
+    weapons,
+  };
+}
+
+/** A pilot weapon (pilot_gear "Weapon"): melee when its only range is Threat. */
+function pilotWeapon(g: any, d: any): SheetWeapon {
+  const tags = parseTags(g.customTags ?? d.tags);
+  let accuracy = 0;
+  if (tags.some((t) => t.id === "tg_accurate")) accuracy += 1;
+  if (tags.some((t) => t.id === "tg_inaccurate")) accuracy -= 1;
+  // Signature weapons have a "variable" damage type the player picks in COMP/CON
+  const damage = (Array.isArray(d.damage) ? d.damage : []).map((x: any) => ({
+    type: g.customDamageType ?? (/variable/i.test(x.type ?? "") ? g.damageType ?? x.type : x.type) ?? "Kinetic",
+    val: String(x.val ?? 0),
+  }));
+  const range = (Array.isArray(g.customRange) ? g.customRange : Array.isArray(d.range) ? d.range : []).map((r: any) => ({ type: r.type ?? "Range", val: String(r.val ?? r.value ?? "") }));
+  return {
+    uid: uid(),
+    id: g.id,
+    name: g.flavorName ? `${g.flavorName} (${d.name})` : d.name ?? prettifyId(g.id),
+    mount: "Pilot",
+    type: "Pilot Weapon",
+    damage,
+    range,
+    tags,
+    effect: toText(d.effect),
+    onHit: toText(d.on_hit),
+    onCrit: toText(d.on_crit),
+    hitStatuses: statusesOf(d.on_hit),
+    critStatuses: statusesOf(d.on_crit),
+    accuracy,
+    actions: parseActions(d.actions),
+    isMelee: range.length > 0 && range.every((r: { type: string }) => /threat/i.test(r.type)),
   };
 }
 

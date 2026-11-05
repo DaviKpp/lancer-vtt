@@ -95,10 +95,12 @@ export interface PilotInfo {
   edef: number;
   speed: number;
   skills: { name: string; rank: number; description?: string }[];
-  talents: { name: string; rank: number; ranks: { name: string; description: string }[] }[];
+  talents: { name: string; rank: number; ranks: { name: string; description: string; actions?: ActionEntry[] }[] }[];
   coreBonuses: { name: string; effect: string }[];
   licenses: { name: string; rank: number }[];
   gear: string[];
+  /** Pilot weapons from the loadout (used on foot, after dismounting). */
+  weapons?: SheetWeapon[];
 }
 
 export interface MechStats {
@@ -215,7 +217,8 @@ export type Sheet = MechSheet | NpcSheet;
 /** Live state, stored per combatant in room metadata. Keep keys short: room metadata is limited to 16kB. */
 export interface CombatantState {
   id: string;
-  kind: "mech" | "npc";
+  /** "pilot": a lancer's pilot outside of the mech (created when dismounting). */
+  kind: "mech" | "npc" | "pilot";
   owner: string; // OBR player id of the owner (GM for NPCs)
   ownerName: string;
   name: string;
@@ -249,6 +252,9 @@ export interface CombatantState {
   dx?: string[]; // uids of destroyed weapons / systems / NPC features (structure damage)
   im?: string; // portrait URL (http only, so it fits in room metadata) shown to everyone
   st?: string[]; // active statuses / conditions (lancer-data status ids)
+  dm?: 1; // mech: the pilot dismounted (the mech is empty)
+  php?: number; // mech: the pilot's HP, kept while mounted
+  pm?: string; // pilot: id of the mech this pilot belongs to
 }
 
 /** Actions spent in the current turn. Short keys: room metadata is size-limited. */
@@ -291,6 +297,8 @@ export interface RollResult {
   bonus: number;
   total: number;
   defense?: number; // evasion or edef of the target
+  defenseLabel?: "Eva" | "Def-E"; // which one (Smart weapons attack E-Defense)
+  ap?: boolean; // the weapon is armor-piercing (AP tag)
   outcome?: "hit" | "miss" | "crit";
   damage?: { type: string; amount: number; detail: string }[];
   notes?: string[];

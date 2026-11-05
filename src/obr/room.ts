@@ -57,11 +57,15 @@ export async function removeCombatant(id: string): Promise<void> {
   const { combatants, encounter } = await getRoomState();
   const tokenId = combatants[id]?.tokenId;
   const update: Metadata = { [COMBATANT_PREFIX + id]: undefined };
+  // a mech's dismounted pilot goes with it
+  const pilot = combatants[`${id}~p`];
+  if (pilot) update[COMBATANT_PREFIX + pilot.id] = undefined;
   if (encounter?.combatants.includes(id)) {
     update[ENCOUNTER_KEY] = { ...encounter, combatants: encounter.combatants.filter((x) => x !== id) };
   }
   await OBR.room.setMetadata(update);
   if (tokenId) await clearTokenLink(tokenId);
+  if (pilot?.tokenId) await clearTokenLink(pilot.tokenId);
 }
 
 /** Approximate size check against Owlbear's 16kB room metadata limit. */

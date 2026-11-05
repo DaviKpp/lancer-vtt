@@ -6,6 +6,7 @@ import { EncounterPanel } from "./components/EncounterPanel";
 import { ImportButton } from "./components/ImportButton";
 import { MechSheetView } from "./components/MechSheetView";
 import { NpcSheetView } from "./components/NpcSheetView";
+import { PilotSheetView } from "./components/PilotSheetView";
 import { RollLogView } from "./components/RollLogView";
 import { TemplateList } from "./components/TemplateList";
 import { ActionGuide } from "./components/ActionGuide";
@@ -61,6 +62,8 @@ export function App() {
     // (another device, cleared storage...).
     const sheetFor = (id: string): Sheet | undefined => {
       const c = room.combatants[id];
+      // a dismounted pilot reads its data from the mech's sheet
+      if (c?.kind === "pilot" && c.pm) return sheetFor(c.pm);
       const local = sheets.get(id);
       const tpl = c?.tpl ? templates.find((t) => t.id === c.tpl) : undefined;
       const base = local ?? (tpl && c ? { ...tpl, raw: undefined, id: c.id, name: c.name } : undefined);
@@ -86,7 +89,7 @@ export function App() {
   if (!session.ready) return <div className="loading">Conectando ao Owlbear Rodeo…</div>;
 
   const all = Object.values(room.combatants).sort((a, b) => a.name.localeCompare(b.name));
-  const mine = all.filter((c) => c.kind === "mech" && (isGM || c.owner === session.playerId));
+  const mine = all.filter((c) => (c.kind === "mech" || c.kind === "pilot") && (isGM || c.owner === session.playerId));
   const openTemplate = openTemplateId ? templates.find((t) => t.id === openTemplateId) : undefined;
 
   const open = openId ? room.combatants[openId] : undefined;
@@ -138,7 +141,8 @@ export function App() {
             <button className="btn-small ghost back" onClick={back}>
               ← Voltar
             </button>
-            {openSheet?.kind === "mech" && <MechSheetView sheet={openSheet} c={open} editable />}
+            {open.kind === "pilot" && openSheet?.kind === "mech" && <PilotSheetView sheet={openSheet} c={open} editable />}
+            {open.kind !== "pilot" && openSheet?.kind === "mech" && <MechSheetView sheet={openSheet} c={open} editable />}
             {openSheet?.kind === "npc" && <NpcSheetView sheet={openSheet} c={open} editable />}
             {!openSheet && (
               <p className="muted">

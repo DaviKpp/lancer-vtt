@@ -57,7 +57,7 @@ export function TargetFields({
           {targets.map((t) => (
             <option key={t.id} value={t.id}>
               {t.name}
-              {t.kind === "npc" ? " (NPC)" : ""}
+              {t.kind === "npc" ? " (NPC)" : t.kind === "pilot" ? " (piloto)" : ""}
             </option>
           ))}
         </select>

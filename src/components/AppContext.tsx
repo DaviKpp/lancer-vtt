@@ -31,12 +31,17 @@ export function computeTargets(room: RoomState, isGM: boolean, attackerId: strin
   let list: CombatantState[];
   if (room.encounter && room.encounter.combatants.length) {
     list = room.encounter.combatants.map((id) => room.combatants[id]).filter((c): c is CombatantState => !!c && c.id !== attackerId);
+    // dismounted pilots of mechs in the encounter can be targeted too
+    const enc = room.encounter.combatants;
+    list.push(...all.filter((c) => c.kind === "pilot" && !!c.pm && enc.includes(c.pm)));
   } else if (isGM) {
     list = all;
   } else {
     list = all.filter((c) => !!c.tokenId);
   }
   // the opposing side first: lancers target NPCs, NPCs target lancers
-  const enemy = room.combatants[attackerId]?.kind === "npc" ? "mech" : "npc";
-  return list.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === enemy ? -1 : 1));
+  const side = (c: CombatantState) => (c.kind === "npc" ? "npc" : "lancer");
+  const attacker = room.combatants[attackerId];
+  const enemy = attacker && side(attacker) === "npc" ? "lancer" : "npc";
+  return list.sort((a, b) => (side(a) === side(b) ? a.name.localeCompare(b.name) : side(a) === enemy ? -1 : 1));
 }

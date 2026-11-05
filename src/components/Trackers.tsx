@@ -41,7 +41,10 @@ export function Trackers({
   // damage that marks structure/stress triggers the structure / overheating check
   const checked = (patch: Partial<CombatantState>) =>
     void patchWithChecks(c, patch, { id: app.session.playerId, name: app.session.playerName });
-  const rows = ROWS.filter((r) => c.kind === "mech" || r.key !== "repairs");
+  const rows =
+    c.kind === "pilot"
+      ? ROWS.filter((r) => r.key === "hp" || r.key === "os" || r.key === "burn")
+      : ROWS.filter((r) => c.kind === "mech" || r.key !== "repairs");
 
   const step = (r: Row, delta: number) => {
     const max = r.max ? (c[r.max] as number) : 999;
@@ -157,6 +160,7 @@ export function DamageInput({ c, onPatch }: { c: CombatantState; onPatch: (p: Pa
   const [type, setType] = useState("Kinetic");
   const [ap, setAp] = useState(false);
   const [resist, setResist] = useState(false);
+  const [reduce, setReduce] = useState(0);
   return (
     <div className="damage-input">
       <span className="tracker-label">Receber dano</span>
@@ -174,11 +178,15 @@ export function DamageInput({ c, onPatch }: { c: CombatantState; onPatch: (p: Pa
       <label className="check" title="Resistência reduz o dano pela metade">
         <input type="checkbox" checked={resist} onChange={(e) => setResist(e.target.checked)} /> Resist.
       </label>
+      <label className="check" title="Reduz o dano em um valor fixo (habilidades, efeitos)">
+        Red.
+        <input className="num-input" type="number" min={0} value={reduce} onChange={(e) => setReduce(Math.max(0, Number(e.target.value) || 0))} />
+      </label>
       <button
         className="btn-small"
         disabled={amount <= 0}
         onClick={() => {
-          const out = applyDamage(c, amount, { ap, type, halve: resist });
+          const out = applyDamage(c, amount, { ap, type, halve: resist, reduce });
           // Burn also gets marked on the sheet (it hurts again at the end of each turn).
           onPatch(type === "Burn" ? { ...out.patch, burn: c.burn + amount } : out.patch);
           void announce(

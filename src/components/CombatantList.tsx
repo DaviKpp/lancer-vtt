@@ -21,6 +21,7 @@ export function MiniBars({ c }: { c: CombatantState }) {
           {c.os ? ` +${c.os}` : ""}
         </span>
       </div>
+      {c.kind !== "pilot" && (
       <div className="mini-row" title={`Calor ${c.heat}/${c.heatcap}`}>
         <span>CL</span>
         <div className="bar bar-heat">
@@ -30,9 +31,15 @@ export function MiniBars({ c }: { c: CombatantState }) {
           {c.heat}/{c.heatcap}
         </span>
       </div>
+      )}
       <div className="mini-pips mono">
-        Estrutura {c.structure}/{c.maxStructure} · Estresse {c.stress}/{c.maxStress}
+        {c.kind === "pilot"
+          ? c.hp <= 0
+            ? "Abatido"
+            : "Piloto fora do mech"
+          : `Estrutura ${c.structure}/${c.maxStructure} · Estresse ${c.stress}/${c.maxStress}`}
         {c.burn ? ` · 🔥${c.burn}` : ""}
+        {c.dm ? " · Sem piloto" : ""}
       </div>
     </div>
   );
@@ -40,7 +47,7 @@ export function MiniBars({ c }: { c: CombatantState }) {
 
 export function CombatantCard({ c, compact }: { c: CombatantState; compact?: boolean }) {
   const app = useApp();
-  const sheet = app.sheets.get(c.id);
+  const sheet = c.kind === "pilot" ? app.sheetFor(c.id) : app.sheets.get(c.id);
   const inEncounter = app.room.encounter?.combatants.includes(c.id);
   const canEdit = app.isGM || c.owner === app.session.playerId;
 
@@ -68,13 +75,14 @@ export function CombatantCard({ c, compact }: { c: CombatantState; compact?: boo
         </div>
         <div className="muted small">
           {c.sub}
-          {app.isGM && c.kind === "mech" && c.ownerName ? ` · ${c.ownerName}` : ""}
+          {app.isGM && c.kind !== "npc" && c.ownerName ? ` · ${c.ownerName}` : ""}
           {!sheet && " · carregando ficha…"}
         </div>
         {!compact && <MiniBars c={c} />}
         <StatusChips c={c} />
       </button>
-      {canEdit && !compact && (
+      {/* a pilot leaves the room by mounting back (from its sheet), not by being removed */}
+      {canEdit && !compact && c.kind !== "pilot" && (
         <div className="card-actions">
           {app.isGM && app.room.encounter && !inEncounter && (
             <button className="btn-small" onClick={addToEncounter}>

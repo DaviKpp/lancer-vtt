@@ -33,5 +33,6 @@ import type { CombatantState, Sheet } from "./types";
 export function imageFor(c: CombatantState | undefined, sheet?: Sheet): string | undefined {
   if (c?.im) return c.im;
   if (!sheet) return undefined;
-  return sheet.kind === "mech" ? sheet.mech.image ?? sheet.pilot.image : sheet.image;
+  if (sheet.kind !== "mech") return sheet.image;
+  return c?.kind === "pilot" ? sheet.pilot.image : sheet.mech.image ?? sheet.pilot.image;
 }

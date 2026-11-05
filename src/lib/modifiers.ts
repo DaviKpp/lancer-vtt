@@ -54,11 +54,16 @@ export function autoModifiers(
 }
 
 /** Defense the attack is rolled against (Smart weapons and tech use E-Defense; Stunned caps Evasion at 5). */
-export function defenseFor(a: AttackShape, target: CombatantState | undefined): { value?: number; note?: string } {
+/** The defense an attack rolls against: E-Defense for tech and Smart attacks, Evasion otherwise. */
+export function defenseFor(
+  a: AttackShape,
+  target: CombatantState | undefined,
+): { value?: number; label?: "Eva" | "Def-E"; note?: string } {
   if (!target) return {};
-  if (a.kind === "tech" || a.smart) return { value: target.edef, note: a.smart && a.kind === "attack" ? "Inteligente: contra Defesa-E" : undefined };
-  if (has(target, "stunned")) return { value: Math.min(target.evasion, 5), note: "Alvo Atordoado: Evasão máx. 5" };
-  return { value: target.evasion };
+  if (a.kind === "tech" || a.smart)
+    return { value: target.edef, label: "Def-E", note: a.smart && a.kind === "attack" ? "Inteligente: contra Defesa-E" : undefined };
+  if (has(target, "stunned")) return { value: Math.min(target.evasion, 5), label: "Eva", note: "Alvo Atordoado: Evasão máx. 5" };
+  return { value: target.evasion, label: "Eva" };
 }
 
 export function netLabel(n: number): string {

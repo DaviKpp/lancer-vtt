@@ -24,14 +24,25 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
   const [done, setDone] = useState<string[]>([]);
   const pending = (r.pending ?? []).filter((p) => !done.includes(p.id));
 
-  const apply = async (ap: boolean) => {
+  // Damage options chosen by the GM before applying: armor-piercing (preset from the weapon's AP tag),
+  // resistance per damage type, and a flat reduction.
+  const typeOf = (t: string) => (t === "Bonus" ? r.damage?.[0]?.type ?? "Kinetic" : t);
+  const types = Array.from(new Set((r.damage ?? []).map((d) => typeOf(d.type))));
+  const [ap, setAp] = useState(!!r.ap);
+  const [resist, setResist] = useState<Record<string, boolean>>({});
+  const [reduce, setReduce] = useState(0);
+
+  const apply = async () => {
     if (!target) return;
-    // Apply each damage type separately so armor / heat / burn are handled correctly.
+    // Apply each damage type separately so armor / heat / burn / resistance are handled correctly;
+    // the flat reduction is used up across them.
     let state = { ...target };
+    let budget = reduce;
     const log: string[] = [];
     for (const d of r.damage ?? []) {
-      const type = d.type === "Bonus" ? r.damage?.[0]?.type ?? "Kinetic" : d.type;
-      const out = applyDamage(state, d.amount, { ap, type });
+      const type = typeOf(d.type);
+      const out = applyDamage(state, d.amount, { ap, type, halve: !!resist[type], reduce: budget });
+      budget -= out.reduced ?? 0;
       state = { ...state, ...out.patch };
       log.push(...out.log);
     }
@@ -122,7 +133,7 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
         {r.targetName && (
           <span className="roll-vs">
             contra {r.targetName}
-            {r.defense !== undefined && app.isGM ? ` (${r.kind === "tech" ? "Def-E" : "Eva"} ${r.defense})` : ""}
+            {r.defense !== undefined && app.isGM ? ` (${r.defenseLabel ?? (r.kind === "tech" ? "Def-E" : "Eva")} ${r.defense})` : ""}
           </span>
         )}
         {r.outcome && <span className={`roll-outcome ${r.outcome}`}>{OUTCOME_PT[r.outcome]}</span>}
@@ -166,12 +177,32 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
         </div>
       )}
       {canApply && (
-        <div className="row gap">
-          <button className="btn-small" onClick={() => apply(false)}>
+        <div className="apply-damage">
+          {r.ap && <span className="badge badge-ap">Arma Perfurante (AP): ignora armadura</span>}
+          <div className="row gap wrap">
+            <label className="check" title="Perfurante (AP): ignora a armadura do alvo">
+              <input type="checkbox" checked={ap} onChange={(e) => setAp(e.target.checked)} /> AP
+            </label>
+            {types.map((t) => (
+              <label key={t} className="check" title={`Resistência a ${tr(t)}: o dano desse tipo cai pela metade (arredonda para cima)`}>
+                <input type="checkbox" checked={!!resist[t]} onChange={(e) => setResist((x) => ({ ...x, [t]: e.target.checked }))} />{" "}
+                Resist. {types.length > 1 ? tr(t) : ""}
+              </label>
+            ))}
+            <label className="check" title="Reduz o dano total em um valor fixo (habilidades, efeitos)">
+              Redução
+              <input
+                className="num-input"
+                type="number"
+                min={0}
+                value={reduce}
+                onChange={(e) => setReduce(Math.max(0, Number(e.target.value) || 0))}
+              />
+            </label>
+          </div>
+          <button className="btn-small" onClick={apply}>
             Aplicar {totalDamage} em {target.name}
-          </button>
-          <button className="btn-small ghost" onClick={() => apply(true)} title="Perfurante (AP): ignora armadura">
-            Aplicar (AP)
+            {ap ? " (AP)" : ""}
           </button>
         </div>
       )}

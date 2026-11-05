@@ -3,6 +3,7 @@ import { tr } from "../lib/i18n";
 import { ActionLine, CostBadges } from "./ActionLine";
 import { Html } from "./Html";
 import { rangeText, signed, Tags } from "./common";
+import { TalentAbilities } from "./TalentAbilities";
 
 const ORDER: Record<string, number> = { weapon: 0, tech: 1, system: 2, reaction: 3, trait: 4 };
 
@@ -70,6 +71,7 @@ export function AbilitySummary({ sheet, c, editable }: { sheet: Sheet; c: Combat
           ))}
         </details>
       ))}
+      <TalentAbilities talents={sheet.pilot.talents} c={c} editable={editable} compact />
       {sheet.core && (
         <details className="ability feature-system">
           <summary>

@@ -39,7 +39,7 @@ export async function announce(
 /** Damage / heat log without hidden numbers (armor, overshield, remaining structure / stress). */
 export function publicLog(log: string[]): string {
   return log
-    .filter((l) => !/^(Armadura|Sobrescudo|Resistência)/.test(l))
+    .filter((l) => !/^(Armadura|Sobrescudo|Resistência|Redução)/.test(l))
     .map((l) => l.replace(/^(Dano de estrutura!|Superaquecimento!).*/, "$1"))
     .join(" · ");
 }

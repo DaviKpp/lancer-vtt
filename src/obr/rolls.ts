@@ -117,6 +117,8 @@ export interface AttackInput {
   reliable?: number; // Reliable X: deals X damage even on a miss
   burn?: number; // Burn X tag: X burn damage on a hit (also marked as burn)
   defense?: number; // overrides the target's Evasion / E-Defense (Smart, Stunned...)
+  defenseLabel?: "Eva" | "Def-E"; // which defense `defense` is
+  ap?: boolean; // armor-piercing weapon
   effect?: string; // shown when the attack hits
   critEffect?: string; // added on a critical hit
   by: { id: string; name: string };
@@ -183,6 +185,8 @@ export function rollAttack(input: AttackInput): RollResult {
     bonus: input.bonus,
     total,
     defense,
+    defenseLabel: defense === undefined ? undefined : input.defenseLabel ?? (input.kind === "tech" ? "Def-E" : "Eva"),
+    ap: input.ap || undefined,
     outcome,
     damage,
     notes: input.notes,

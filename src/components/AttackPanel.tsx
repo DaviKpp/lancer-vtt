@@ -39,6 +39,8 @@ export interface AttackSpec {
   melee?: boolean;
   seeking?: boolean;
   smart?: boolean;
+  /** Armor-piercing (AP tag): its damage ignores armor. */
+  ap?: boolean;
 }
 
 export interface InvadeOption {

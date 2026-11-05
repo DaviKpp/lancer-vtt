@@ -47,6 +47,30 @@ export function mechWeaponSpec(w: SheetWeapon, sheet: MechSheet): AttackSpec {
     melee: w.isMelee,
     seeking: w.tags.some((t) => t.id === "tg_seeking"),
     smart: w.tags.some((t) => t.id === "tg_smart"),
+    ap: w.tags.some((t) => t.id === "tg_ap"),
+  };
+}
+
+/** Pilot on foot: "Lutar" (Fight) is a full action — one attack with a pilot weapon, Grit as the bonus. */
+export function pilotWeaponSpec(w: SheetWeapon, sheet: MechSheet): AttackSpec {
+  return {
+    kind: "attack",
+    label: w.name,
+    bonus: sheet.pilot.grit,
+    accuracy: w.accuracy,
+    damage: w.damage,
+    reliable: reliableValue(w.tags),
+    burn: tagValue(w.tags, "tg_burn"),
+    effect: w.onHit,
+    critEffect: w.onCrit,
+    hitStatuses: w.hitStatuses,
+    critStatuses: w.critStatuses,
+    cost: "full",
+    costLabel: "Lutar",
+    melee: w.isMelee,
+    seeking: w.tags.some((t) => t.id === "tg_seeking"),
+    smart: w.tags.some((t) => t.id === "tg_smart"),
+    ap: w.tags.some((t) => t.id === "tg_ap"),
   };
 }
 
@@ -118,6 +142,7 @@ export function npcFeatureSpec(f: NpcFeatureSheet, sheet: NpcSheet): AttackSpec 
     melee: f.isMelee,
     seeking: f.tags.some((t) => t.id === "tg_seeking"),
     smart: f.tags.some((t) => t.id === "tg_smart"),
+    ap: f.tags.some((t) => t.id === "tg_ap"),
   };
 }
 

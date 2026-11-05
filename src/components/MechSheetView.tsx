@@ -10,6 +10,9 @@ import { ActionLine, CostBadges } from "./ActionLine";
 import { DestroyToggle } from "./DestroyToggle";
 import { SkillChecks } from "./SkillChecks";
 import { Portrait } from "./Portrait";
+import { TalentAbilities } from "./TalentAbilities";
+import { dismount, mount } from "../obr/mount";
+import { pilotIdFor } from "../lib/pilot";
 import { BarragePanel } from "./BarragePanel";
 import { ActionGuide } from "./ActionGuide";
 import { TurnTracker } from "./TurnTracker";
@@ -33,6 +36,7 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
 
   const mechImage = sheet.mech.image !== brokenMechImage ? sheet.mech.image : undefined;
   const pilotLabel = sheet.pilot.callsign || sheet.pilot.name;
+  const by = { id: app.session.playerId, name: app.session.playerName };
 
   return (
     <div className="sheet">
@@ -68,6 +72,31 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
           </div>
         </div>
       </div>
+
+      {c.dm ? (
+        <div className="dismounted-banner">
+          <strong>🧍 Piloto fora do mech</strong>
+          <span className="muted small"> — o mech está vazio até o piloto montar de volta.</span>
+          <div className="row gap wrap">
+            <button className="btn-small ghost" onClick={() => app.openSheet(pilotIdFor(c.id))}>
+              Abrir piloto
+            </button>
+            {editable && (
+              <button className="btn-small" onClick={() => void mount(c, by)} title="Ação Inteira">
+                🤖 Montar
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        editable && (
+          <div className="row gap">
+            <button className="btn-small ghost" onClick={() => void dismount(c, sheet, by)} title="Ação Inteira: o piloto sai do mech">
+              🧍 Desmontar
+            </button>
+          </div>
+        )
+      )}
 
       <Trackers c={c} editable={editable} onPatch={(patch) => patchCombatant(c.id, patch)} />
       <Conditions c={c} editable={editable} />
@@ -202,6 +231,10 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
         ))}
       </Section>
 
+      <Section title={`Talentos do piloto (${sheet.pilot.talents.length})`}>
+        <TalentAbilities talents={sheet.pilot.talents} c={c} editable={editable} />
+      </Section>
+
       <Section title="Sistema Núcleo">
         {sheet.core ? (
           <div className="card core">
@@ -280,20 +313,9 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
             </li>
           ))}
         </ul>
-        <h4>Talentos</h4>
-        {p.talents.map((t, i) => (
-          <details key={i} className="talent">
-            <summary>
-              {t.name} <span className="badge">Grau {t.rank}</span>
-            </summary>
-            {t.ranks.map((r, j) => (
-              <div key={j} className="action">
-                <span className="action-name">{r.name}</span>
-                <Html html={r.description} />
-              </div>
-            ))}
-          </details>
-        ))}
+        <p className="muted small">
+          Talentos: {p.talents.map((t) => `${t.name} ${t.rank}`).join(", ") || "nenhum"} — detalhes e ações em “Talentos do piloto”.
+        </p>
         {p.coreBonuses.length > 0 && (
           <>
             <h4>Bônus de núcleo</h4>

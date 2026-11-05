@@ -46,6 +46,8 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
     bonus: spec.bonus,
     accuracy: auto + o.manual,
     defense: def.value,
+    defenseLabel: def.label,
+    ap: spec.ap,
     damage: spec.damage,
     bonusDamage: o.bonusDamage,
     reliable: spec.reliable,
