@@ -205,6 +205,8 @@ const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 const tmpQ = new THREE.Quaternion();
 let start = -1;
 let captionShown = false;
+// The caption is for the roller only; outside Owlbear (preview) it always shows.
+let captionAllowed = window.parent === window;
 
 function place(d: Die, t: number) {
   const local = Math.max(0, Math.min(1, (t - d.delay) / ROLL_TIME));
@@ -254,7 +256,7 @@ function frame(now: number) {
   separate();
   renderer.render(scene, camera);
   const settled = t > ROLL_TIME + lastDelay;
-  if (settled && !captionShown) {
+  if (settled && !captionShown && captionAllowed) {
     captionShown = true;
     caption.classList.add("show");
   }
@@ -270,6 +272,7 @@ function close() {
 if (window.parent === window) requestAnimationFrame(frame);
 
 OBR.onReady(() => {
+  captionAllowed = !show?.byId || show.byId === OBR.player.id;
   document.body.addEventListener("click", close);
   if (!dice.length) close();
   else requestAnimationFrame(frame);

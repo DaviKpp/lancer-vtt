@@ -36,6 +36,7 @@ export function DicePicker() {
   const test = () =>
     void previewDice({
       id: `preview-${Date.now()}`,
+      byId: app.session.playerId,
       title: app.session.playerName,
       label: "Teste dos dados",
       result: "",

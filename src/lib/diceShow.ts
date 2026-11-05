@@ -17,6 +17,8 @@ export interface ShownDie {
 export interface DiceShow {
   id: string;
   title: string; // "Kai (Ana)"
+  /** Player who rolled: only they see the caption (everyone else already gets the general notification). */
+  byId?: string;
   label: string; // weapon / check name
   result: string; // "18 — ACERTO · 7 de dano"
   dice: ShownDie[];
@@ -64,6 +66,7 @@ export function diceForRoll(r: RollResult): DiceShow | null {
 
   return {
     id: r.id,
+    byId: r.byId,
     title: r.by && r.by !== r.attackerName ? `${r.attackerName} (${r.by})` : r.attackerName,
     label: r.targetName && r.targetId !== r.attackerId ? `${r.label} → ${r.targetName}` : r.label,
     result: parts.join(" — "),

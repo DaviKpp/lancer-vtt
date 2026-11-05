@@ -21,6 +21,7 @@ const TOAST_CHANNEL = `${ID}/toast`;
 const MAX_VISIBLE = 3;
 const ROW_H = 62; // px per toast, see toast.html
 const WIDTH = 560;
+const BOTTOM_GAP = 80; // px from the bottom of the screen, clear of the toolbar
 
 /** Shows a notification on this player's screen. */
 export async function notify(message: string, variant: Variant = "INFO") {
@@ -76,7 +77,8 @@ async function sync() {
       width: Math.round(Math.min(WIDTH, vw - 32)),
       height,
       anchorReference: "POSITION",
-      anchorPosition: { left: Math.round(vw / 2), top: Math.round(vh - 20) },
+      // above Owlbear's bottom toolbar
+      anchorPosition: { left: Math.round(vw / 2), top: Math.round(vh - BOTTOM_GAP) },
       anchorOrigin: { horizontal: "CENTER", vertical: "BOTTOM" },
       transformOrigin: { horizontal: "CENTER", vertical: "BOTTOM" },
       hidePaper: true,
