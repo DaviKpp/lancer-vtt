@@ -39,7 +39,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 export function sanitizeSet(v: unknown): DiceSet | undefined {
   const s = v as Partial<DiceSet> | null;
   if (!s || typeof s !== "object") return undefined;
-  if (!s.material || !(s.material in MATERIAL_LABEL)) return undefined;
+  if (typeof s.material !== "string" || !Object.prototype.hasOwnProperty.call(MATERIAL_LABEL, s.material)) return undefined;
   if (![s.body, s.accent, s.ink].every((c) => typeof c === "string" && HEX.test(c))) return undefined;
   return { material: s.material, body: s.body!, accent: s.accent!, ink: s.ink! };
 }

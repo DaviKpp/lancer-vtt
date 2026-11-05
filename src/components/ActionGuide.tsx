@@ -99,11 +99,14 @@ export function ActionGuide({ c, sheet, editable }: { c?: CombatantState; sheet?
         if (fresh.ac?.o) await notify(`${fresh.name} já usou Sobrecarga neste turno.`, "WARNING");
         const uses = fresh.ocn ?? 0;
         const roll = rollExpression(overchargeCost(uses));
-        const heat = applyHeat(fresh, roll.total);
-        await patchWithChecks(fresh, { ...heat.patch, ocn: uses + 1, ac: { ...(fresh.ac ?? {}), o: true } }, by);
-        return takeAction(fresh, "free", "Sobrecarga", by, {
-          detail: `+1 Ação Rápida · ${roll.total} de calor (${roll.detail})${heat.log.length > 1 ? " · " + heat.log.slice(1).join(" · ") : ""}`,
+        const preview = applyHeat(fresh, roll.total);
+        // log first (it throws the heat dice and waits for them), then mark the heat
+        await takeAction(fresh, "free", "Sobrecarga", by, {
+          detail: `+1 Ação Rápida · ${roll.total} de calor (${roll.detail})${preview.log.length > 1 ? " · " + preview.log.slice(1).join(" · ") : ""}`,
         });
+        const now = (await getRoomState()).combatants[c.id] ?? fresh;
+        const heat = applyHeat(now, roll.total);
+        return patchWithChecks(now, { ...heat.patch, ocn: uses + 1, ac: { ...(now.ac ?? {}), o: true } }, by);
       }
     }
   };

@@ -3,7 +3,8 @@
 //
 // Any page of the extension calls notify(); the message goes over a LOCAL broadcast to the
 // background page, which keeps the queue (up to 3 at once) and shows them in a small transparent
-// popover (toast.html). The queue is shared with that popover through localStorage (same origin).
+// popover (toast.html). The queue is shared with that popover through localStorage (same origin),
+// under a key unique to this tab so two Owlbear tabs in the same browser don't mix their toasts.
 import OBR from "@owlbear-rodeo/sdk";
 import { ID } from "./constants";
 
@@ -16,10 +17,13 @@ export interface Toast {
 }
 
 export const TOAST_POPOVER_ID = `${ID}/toast`;
-export const TOAST_STORAGE_KEY = "lancer-vtt:toasts";
+const TOAST_STORAGE_PREFIX = "lancer-vtt:toasts:";
+/** Storage key for one tab's queue (the popover gets the tab id in its URL). */
+export const toastKey = (tab: string) => `${TOAST_STORAGE_PREFIX}${tab}`;
+const TAB = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const TOAST_CHANNEL = `${ID}/toast`;
 const MAX_VISIBLE = 3;
-const ROW_H = 62; // px per toast, see toast.html
+const ROW_H = 72; // first guess of the height per toast; the popover then measures itself
 const WIDTH = 560;
 const BOTTOM_GAP = 80; // px from the bottom of the screen, clear of the toolbar
 
@@ -33,9 +37,9 @@ export async function notify(message: string, variant: Variant = "INFO") {
   }
 }
 
-export function readToasts(): Toast[] {
+export function readToasts(key: string): Toast[] {
   try {
-    const list = JSON.parse(localStorage.getItem(TOAST_STORAGE_KEY) ?? "[]");
+    const list = JSON.parse(localStorage.getItem(key) ?? "[]");
     return Array.isArray(list) ? list : [];
   } catch {
     return [];
@@ -44,7 +48,8 @@ export function readToasts(): Toast[] {
 
 function writeToasts(list: Toast[]) {
   try {
-    localStorage.setItem(TOAST_STORAGE_KEY, JSON.stringify(list));
+    if (list.length) localStorage.setItem(toastKey(TAB), JSON.stringify(list));
+    else localStorage.removeItem(toastKey(TAB));
   } catch {
     // ignore
   }
@@ -64,16 +69,14 @@ async function sync() {
       open = false;
       return;
     }
+    // already open: the popover sees the new list and resizes itself
+    if (open) return;
+    open = true; // before any await, so two quick toasts don't open it twice
     const height = items.length * ROW_H + 12;
-    if (open) {
-      await OBR.popover.setHeight(TOAST_POPOVER_ID, height);
-      return;
-    }
     const [vw, vh] = await Promise.all([OBR.viewport.getWidth(), OBR.viewport.getHeight()]);
-    open = true;
     await OBR.popover.open({
       id: TOAST_POPOVER_ID,
-      url: "/toast.html",
+      url: `/toast.html?tab=${TAB}`,
       width: Math.round(Math.min(WIDTH, vw - 32)),
       height,
       anchorReference: "POSITION",
@@ -107,14 +110,28 @@ export function pushToast(message: string, variant: Variant = "INFO") {
 /** Background page: show the toasts other pages of the extension send. */
 export function startToasts() {
   writeToasts([]);
+  window.addEventListener("beforeunload", () => writeToasts([]));
+  // queues left behind by tabs that closed without cleaning up
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(TOAST_STORAGE_PREFIX) && k !== toastKey(TAB)) {
+        const list = JSON.parse(localStorage.getItem(k) ?? "[]") as Toast[];
+        const newest = Math.max(0, ...list.map((t) => Number(String(t.id).split("-")[0]) || 0));
+        if (Date.now() - newest > 60_000) localStorage.removeItem(k);
+      }
+    }
+  } catch {
+    // ignore
+  }
   OBR.broadcast.onMessage(TOAST_CHANNEL, (e) => {
     const m = e.data as { message?: string; variant?: Variant };
     if (m?.message) pushToast(m.message, m.variant ?? "INFO");
   });
   // A toast clicked away in the popover removes itself from the shared list.
   window.addEventListener("storage", (e) => {
-    if (e.key !== TOAST_STORAGE_KEY) return;
-    const ids = new Set(readToasts().map((t) => t.id));
+    if (e.key !== toastKey(TAB)) return;
+    const ids = new Set(readToasts(toastKey(TAB)).map((t) => t.id));
     const next = items.filter((t) => ids.has(t.id));
     if (next.length !== items.length) {
       items = next;
