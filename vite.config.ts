@@ -18,6 +18,8 @@ export default defineConfig({
         background: resolve(__dirname, "background.html"),
         // Modal opened from the token context menu to link a sheet
         link: resolve(__dirname, "link.html"),
+        // Transparent popover with the 3D dice thrown by players
+        dice: resolve(__dirname, "dice.html"),
       },
     },
   },

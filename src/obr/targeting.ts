@@ -1,59 +1,18 @@
-// Picking attack targets by clicking tokens on the map, and the attacker → target arrow.
+// Attacker → target arrow, with the distance between them in the middle.
 //
-// - The attack panel (popover) calls beginPick(): it stores the attacker in the tool's metadata
-//   and switches to the "Escolher alvo" tool. The tool (created by the background page) shows a
-//   preview arrow following the pointer; clicking a linked token reports it back over a LOCAL
-//   broadcast and restores the previous tool.
-// - Once a target is chosen the popover broadcasts the arrow to ALL players; every background
-//   page draws it as a local item (nothing is stored in the scene) and keeps it on the tokens
-//   when they move. It goes away when the attack panel closes (or after a safety timeout).
-import OBR, { buildPath, Command, type Item, type PathCommand, type Vector2 } from "@owlbear-rodeo/sdk";
-import type { CombatantState } from "../lib/types";
+// While an attack panel has a target, the popover broadcasts the arrow to ALL players; every
+// background page draws it as local items (nothing is stored in the scene) and keeps it on the
+// tokens when they move. It goes away when the attack panel closes (or after a safety timeout).
+import OBR, { buildPath, buildText, Command, type Item, type PathCommand, type Vector2 } from "@owlbear-rodeo/sdk";
 import { ID } from "./constants";
-import { readRoomState } from "./room";
 
-export const TARGET_TOOL_ID = `${ID}/target-tool`;
-const TARGET_MODE_ID = `${ID}/target-mode`;
-const PICK_CHANNEL = `${ID}/pick`;
 const ARROW_CHANNEL = `${ID}/arrow`;
 const ARROW_KEY = `${ID}/arrow`;
-const PREVIEW_ID = `${ARROW_KEY}/preview`;
 const ARROW_TTL = 3 * 60_000;
 
-interface PickMeta {
-  attackerId?: string;
-  attackerTokenId?: string;
-  prevTool?: string;
-  [key: string]: unknown;
-}
-type PickMsg = { attackerId: string; targetId: string };
 type ArrowMsg = { attackerId: string; from?: string; to?: string };
 
 // ---------------------------------------------------------------- popover side
-
-/** Switches to the targeting tool for `attacker` (needs a linked token). */
-export async function beginPick(attacker: CombatantState) {
-  if (!attacker.tokenId) return;
-  const current = await OBR.tool.getActiveTool();
-  const prevTool = current === TARGET_TOOL_ID ? ((await OBR.tool.getMetadata(TARGET_TOOL_ID)) as PickMeta)?.prevTool : current;
-  await OBR.tool.setMetadata(TARGET_TOOL_ID, { attackerId: attacker.id, attackerTokenId: attacker.tokenId, prevTool });
-  await OBR.tool.activateTool(TARGET_TOOL_ID);
-}
-
-/** Leaves the targeting tool (if it's still active), going back to the previous one. */
-export async function endPick() {
-  if ((await OBR.tool.getActiveTool()) !== TARGET_TOOL_ID) return;
-  const meta = (await OBR.tool.getMetadata(TARGET_TOOL_ID)) as PickMeta | undefined;
-  await OBR.tool.activateTool(meta?.prevTool || "rodeo.owlbear.tool/move");
-}
-
-/** Calls `fn` with the combatant id clicked while picking for `attackerId`. */
-export function onPicked(attackerId: string, fn: (targetId: string) => void) {
-  return OBR.broadcast.onMessage(PICK_CHANNEL, (e) => {
-    const m = e.data as PickMsg;
-    if (m?.attackerId === attackerId && m.targetId) fn(m.targetId);
-  });
-}
 
 /** Shows (to everyone) an arrow from the attacker's token to the target's token. */
 export function showArrow(attackerId: string, from: string, to: string) {
@@ -97,63 +56,109 @@ function arrowCommands(a: Vector2, b: Vector2, dpi: number): PathCommand[] | nul
   ];
 }
 
-function buildArrow(id: string, commands: PathCommand[], dpi: number, faint: boolean): Item {
+function buildArrow(id: string, commands: PathCommand[], dpi: number): Item {
   return buildPath()
     .id(id)
     .name("LANCER alvo")
     .position({ x: 0, y: 0 })
     .commands(commands)
     .fillColor(RED)
-    .fillOpacity(faint ? 0.45 : 0.85)
+    .fillOpacity(0.85)
     .strokeColor("#000000")
     .strokeOpacity(0.8)
     .strokeWidth(Math.max(1, dpi * 0.02))
     .layer("RULER")
+    .zIndex(0)
     .locked(true)
     .disableHit(true)
     .metadata({ [ARROW_KEY]: true })
     .build();
 }
 
-/** Adds or updates one local arrow item (or removes it when there's nothing to draw). */
-async function upsertArrow(id: string, a: Vector2, b: Vector2, faint = false) {
-  const dpi = await OBR.scene.grid.getDpi();
-  const commands = arrowCommands(a, b, dpi);
-  const existing = await OBR.scene.local.getItems([id]);
-  if (!commands) {
-    if (existing.length) await OBR.scene.local.deleteItems([id]);
-    return;
-  }
-  if (!existing.length) {
-    await OBR.scene.local.addItems([buildArrow(id, commands, dpi, faint)]);
-    return;
-  }
-  await OBR.scene.local.updateItems([id], (drafts) => {
-    for (const d of drafts) {
-      const path = d as unknown as { commands: PathCommand[]; style: { fillOpacity: number } };
-      path.commands = commands;
-      path.style.fillOpacity = faint ? 0.45 : 0.85;
-    }
-  });
+function labelBox(mid: Vector2, dpi: number) {
+  const width = dpi * 2;
+  const height = dpi * 0.5;
+  return { position: { x: mid.x - width / 2, y: mid.y - height / 2 }, width, height, fontSize: Math.max(12, dpi * 0.3) };
 }
 
-async function removeLocal(ids: string[]) {
-  const existing = await OBR.scene.local.getItems(ids);
-  if (existing.length) await OBR.scene.local.deleteItems(existing.map((i) => i.id));
+function buildLabelItem(id: string, text: string, mid: Vector2, dpi: number): Item {
+  const box = labelBox(mid, dpi);
+  return buildText()
+    .id(id)
+    .name("LANCER distância")
+    .position(box.position)
+    .textType("PLAIN")
+    .plainText(text)
+    .width(box.width)
+    .height(box.height)
+    .fontSize(box.fontSize)
+    .fontWeight(800)
+    .fillColor("#ffffff")
+    .strokeColor("#000000")
+    .strokeOpacity(1)
+    .strokeWidth(Math.max(2, box.fontSize * 0.16))
+    .textAlign("CENTER")
+    .textAlignVertical("MIDDLE")
+    .padding(0)
+    .layer("RULER")
+    .zIndex(1)
+    .locked(true)
+    .disableHit(true)
+    .metadata({ [ARROW_KEY]: true })
+    .build();
+}
+
+/** "5" in grid units, using the scene's scale (e.g. "25 ft" if the grid says 5ft). */
+async function distanceText(a: Vector2, b: Vector2) {
+  const [cells, scale] = await Promise.all([OBR.scene.grid.getDistance(a, b), OBR.scene.grid.getScale()]);
+  const { multiplier, unit, digits } = scale.parsed;
+  const value = (cells * (multiplier || 1)).toFixed(Math.max(0, digits ?? 0));
+  return unit ? `${value} ${unit}` : value;
+}
+
+/** Adds or updates the arrow + distance label for one attacker (removes them if too short). */
+async function upsertArrow(baseId: string, a: Vector2, b: Vector2) {
+  const dpi = await OBR.scene.grid.getDpi();
+  const arrowId = baseId;
+  const labelId = `${baseId}/label`;
+  const commands = arrowCommands(a, b, dpi);
+  const existing = new Set((await OBR.scene.local.getItems([arrowId, labelId])).map((i) => i.id));
+  if (!commands) {
+    if (existing.size) await OBR.scene.local.deleteItems([...existing]);
+    return;
+  }
+  const text = await distanceText(a, b);
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+
+  const add: Item[] = [];
+  if (!existing.has(arrowId)) add.push(buildArrow(arrowId, commands, dpi));
+  if (!existing.has(labelId)) add.push(buildLabelItem(labelId, text, mid, dpi));
+  if (add.length) await OBR.scene.local.addItems(add);
+
+  const update = [arrowId, labelId].filter((id) => existing.has(id));
+  if (update.length) {
+    const box = labelBox(mid, dpi);
+    await OBR.scene.local.updateItems(update, (drafts) => {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      for (const d of drafts as any[]) {
+        if (d.id === arrowId) d.commands = commands;
+        else {
+          d.position = box.position;
+          d.text.plainText = text;
+        }
+      }
+    });
+  }
 }
 
 // ---------------------------------------------------------------- background side
 
-/** Creates the targeting tool and draws arrows. Call once from the background page. */
+/** Draws the arrows broadcast by attack panels. Call once from the background page. */
 export function startTargeting() {
-  let combatants: Record<string, CombatantState> = {};
   const arrows = new Map<string, { from: string; to: string; expires: number }>();
   let sceneReady = false;
-  let previewBusy = false;
-  let previewNext: (() => Promise<void>) | null = null;
-
-  const byToken = (tokenId?: string) =>
-    tokenId ? Object.values(combatants).find((c) => c.tokenId === tokenId) : undefined;
+  let drawing = false;
+  let again = false;
 
   const tokenCenter = async (tokenId: string) => {
     try {
@@ -163,104 +168,48 @@ export function startTargeting() {
     }
   };
 
-  // Preview updates arrive on every pointer move: run them one at a time, keeping only the latest.
-  const preview = (job: () => Promise<void>) => {
-    if (previewBusy) {
-      previewNext = job;
-      return;
-    }
-    previewBusy = true;
-    void job()
-      .catch(() => undefined)
-      .finally(() => {
-        previewBusy = false;
-        const next = previewNext;
-        previewNext = null;
-        if (next) preview(next);
-      });
-  };
-
   async function drawArrows() {
     if (!sceneReady) return;
-    const now = Date.now();
-    const wanted = new Set<string>();
-    for (const [attackerId, a] of arrows) {
-      if (a.expires < now) {
-        arrows.delete(attackerId);
-        continue;
-      }
-      const [from, to] = await Promise.all([tokenCenter(a.from), tokenCenter(a.to)]);
-      const id = `${ARROW_KEY}/${attackerId}`;
-      if (!from || !to) continue;
-      wanted.add(id);
-      await upsertArrow(id, from, to);
+    if (drawing) {
+      again = true;
+      return;
     }
-    const stale = await OBR.scene.local.getItems(
-      (i) => i.metadata[ARROW_KEY] !== undefined && i.id !== PREVIEW_ID && !wanted.has(i.id),
-    );
-    if (stale.length) await OBR.scene.local.deleteItems(stale.map((i) => i.id));
+    drawing = true;
+    try {
+      const now = Date.now();
+      const wanted = new Set<string>();
+      for (const [attackerId, a] of arrows) {
+        if (a.expires < now) {
+          arrows.delete(attackerId);
+          continue;
+        }
+        const [from, to] = await Promise.all([tokenCenter(a.from), tokenCenter(a.to)]);
+        if (!from || !to) continue;
+        const id = `${ARROW_KEY}/${attackerId}`;
+        wanted.add(id);
+        wanted.add(`${id}/label`);
+        await upsertArrow(id, from, to);
+      }
+      const stale = await OBR.scene.local.getItems((i) => i.metadata[ARROW_KEY] !== undefined && !wanted.has(i.id));
+      if (stale.length) await OBR.scene.local.deleteItems(stale.map((i) => i.id));
+    } catch (e) {
+      console.warn("[lancer-vtt] arrow render failed", e);
+    } finally {
+      drawing = false;
+      if (again) {
+        again = false;
+        scheduleDraw();
+      }
+    }
   }
 
   let drawTimer: ReturnType<typeof setTimeout> | undefined;
   const scheduleDraw = () => {
     clearTimeout(drawTimer);
-    drawTimer = setTimeout(() => void drawArrows().catch(() => undefined), 60);
+    drawTimer = setTimeout(() => void drawArrows(), 60);
   };
 
   OBR.onReady(async () => {
-    combatants = readRoomState(await OBR.room.getMetadata()).combatants;
-    OBR.room.onMetadataChange((m) => {
-      combatants = readRoomState(m).combatants;
-    });
-
-    await OBR.tool.create({
-      id: TARGET_TOOL_ID,
-      icons: [{ icon: "/target.svg", label: "Escolher alvo (LANCER)" }],
-      defaultMode: TARGET_MODE_ID,
-    });
-
-    await OBR.tool.createMode({
-      id: TARGET_MODE_ID,
-      icons: [{ icon: "/target.svg", label: "Clique no token alvo", filter: { activeTools: [TARGET_TOOL_ID] } }],
-      cursors: [{ cursor: "crosshair" }],
-      preventDrag: { dragging: true },
-      onToolMove(context, event) {
-        const meta = context.metadata as PickMeta;
-        if (!meta.attackerTokenId) return;
-        const hovered = byToken(event.target?.id);
-        const snap = hovered && hovered.id !== meta.attackerId ? hovered.tokenId : undefined;
-        preview(async () => {
-          const from = await tokenCenter(meta.attackerTokenId!);
-          if (!from) return;
-          const to = snap ? await tokenCenter(snap) : event.pointerPosition;
-          await upsertArrow(PREVIEW_ID, from, to ?? event.pointerPosition, !snap);
-        });
-      },
-      async onToolClick(context, event) {
-        const meta = context.metadata as PickMeta;
-        if (!meta.attackerId) {
-          await OBR.notification.show("Abra um ataque na ficha para escolher o alvo.", "INFO");
-          return;
-        }
-        const target = byToken(event.target?.id);
-        if (!target || target.id === meta.attackerId) {
-          await OBR.notification.show("Clique em um token vinculado a um combatente LANCER (Esc cancela).", "WARNING");
-          return;
-        }
-        await OBR.broadcast.sendMessage(PICK_CHANNEL, { attackerId: meta.attackerId, targetId: target.id } satisfies PickMsg, {
-          destination: "LOCAL",
-        });
-        await OBR.tool.activateTool(meta.prevTool || "rodeo.owlbear.tool/move");
-      },
-      onKeyDown(context, event) {
-        if (event.key === "Escape") void OBR.tool.activateTool((context.metadata as PickMeta).prevTool || "rodeo.owlbear.tool/move");
-      },
-      onDeactivate() {
-        previewNext = null;
-        void removeLocal([PREVIEW_ID]).catch(() => undefined);
-      },
-    });
-
     OBR.broadcast.onMessage(ARROW_CHANNEL, (e) => {
       const m = e.data as ArrowMsg;
       if (!m?.attackerId) return;

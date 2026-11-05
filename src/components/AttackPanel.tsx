@@ -11,7 +11,7 @@ import { autoModifiers, COVER_LABEL, defenseFor, isRanged, netLabel, type Cover 
 import type { StatusEffect } from "../lib/types";
 import { statusInfo } from "../lib/statuses";
 import { Html } from "./Html";
-import { beginPick, clearArrow, endPick, onPicked, showArrow } from "../obr/targeting";
+import { clearArrow, showArrow } from "../obr/targeting";
 
 export interface AttackSpec {
   kind: "attack" | "tech";
@@ -61,9 +61,7 @@ export function AttackPanel({
 }) {
   const app = useApp();
   const targets = app.targetsFor(attacker.id);
-  // With a linked token the target is picked by clicking on the map; otherwise default to the first one.
-  const canPick = app.sceneReady && !!attacker.tokenId;
-  const [targetId, setTargetId] = useState<string>(canPick ? "" : targets[0]?.id ?? "");
+  const [targetId, setTargetId] = useState<string>(targets[0]?.id ?? "");
   // extra accuracy / difficulty chosen by the player, on top of the automatic modifiers
   const [acc, setAcc] = useState(0);
   const [diff, setDiff] = useState(0);
@@ -86,20 +84,13 @@ export function AttackPanel({
   const autoNet = mods.reduce((a, m) => a + m.value, 0);
   const def = defenseFor(effective, target);
 
-  // Start in "click the target" mode, and listen for the token picked on the map.
-  useEffect(() => {
-    if (!canPick) return;
-    const off = onPicked(attacker.id, (id) => {
-      if (app.targetsFor(attacker.id).some((t) => t.id === id)) setTargetId(id);
-      else void OBR.notification.show("Esse combatente não pode ser alvo deste ataque.", "WARNING");
-    });
-    void beginPick(attacker);
-    return () => {
-      off();
-      void endPick();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attacker.id, canPick]);
+  const pickSelected = async () => {
+    const sel = await OBR.player.getSelection();
+    const tokenId = sel?.[0];
+    const match = Object.values(app.room.combatants).find((c) => c.tokenId && c.tokenId === tokenId);
+    if (match && match.id !== attacker.id) setTargetId(match.id);
+    else void OBR.notification.show("Selecione primeiro um token vinculado a um combatente LANCER.", "WARNING");
+  };
 
   // Arrow from the attacker to the chosen target, shown to everyone while this panel is open.
   const fromToken = current.tokenId;
@@ -153,7 +144,7 @@ export function AttackPanel({
         <label>Alvo</label>
         <div className="row gap">
           <select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-            <option value="">{canPick ? "— clique no alvo no mapa —" : "— sem alvo —"}</option>
+            <option value="">— sem alvo —</option>
             {targets.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -161,9 +152,9 @@ export function AttackPanel({
               </option>
             ))}
           </select>
-          {canPick && (
-            <button className="btn-small ghost" onClick={() => void beginPick(attacker)} title="Clique no token alvo no mapa (Esc cancela)">
-              🎯 No mapa
+          {app.sceneReady && (
+            <button className="btn-small ghost" onClick={pickSelected} title="Usar o token selecionado no mapa">
+              Selecionado
             </button>
           )}
         </div>

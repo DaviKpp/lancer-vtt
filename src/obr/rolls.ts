@@ -5,6 +5,7 @@ import { rollAccuracy, rollDie, rollExpression } from "../lib/dice";
 import { uid } from "../lib/util";
 import { ROLL_CHANNEL } from "./constants";
 import { announce } from "./announce";
+import { throwDice } from "./dice";
 import { tr } from "../lib/i18n";
 
 const MAX_LOG = 60;
@@ -71,6 +72,7 @@ export const rollLog = new RollLog();
 export async function publishRoll(r: RollResult) {
   rollLog.add(r);
   await OBR.broadcast.sendMessage(ROLL_CHANNEL, r, { destination: "REMOTE" });
+  void throwDice(r); // 3D dice on everyone's screen (player rolls only)
   if (r.kind === "skill") {
     await announce(
       `${r.attackerName}: ${r.label} ${r.total} (alvo ${r.defense}) — ${r.outcome === "hit" ? "SUCESSO" : "FALHA"}`,
