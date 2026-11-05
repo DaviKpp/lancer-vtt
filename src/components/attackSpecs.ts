@@ -114,6 +114,7 @@ export function npcFeatureSpec(f: NpcFeatureSheet, sheet: NpcSheet): AttackSpec 
     hitStatuses: f.hitStatuses,
     critStatuses: f.critStatuses,
     cost: declared ? costFromActivation(declared) : superheavy ? "full" : "quick",
+    attacks: f.attacks && f.attacks > 1 ? f.attacks : undefined,
     melee: f.isMelee,
     seeking: f.tags.some((t) => t.id === "tg_seeking"),
     smart: f.tags.some((t) => t.id === "tg_smart"),

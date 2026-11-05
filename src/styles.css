@@ -1252,3 +1252,41 @@ button.tag {
   height: 28px;
   padding: 2px;
 }
+
+/* one block per attack (Barrage, NPC weapons that attack several times) */
+.attack-row {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--obr-primary);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.attack-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 12px;
+}
+.attack-row .form-grid,
+.attack-panel .attack-row .form-grid {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+.attack-row .form-grid > * {
+  min-width: 0;
+}
+.attack-row .form-grid select {
+  width: 100%;
+  min-width: 0;
+}
+.attack-row .form-grid .row > select {
+  flex: 1 1 0;
+}
+.attack-row .form-grid .row > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

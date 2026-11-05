@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
+import { newTargetRow, TargetFields, useTargetArrows, type TargetRow } from "./AttackTarget";
 import type { CombatantState, RollResult, Sheet } from "../lib/types";
 import { tr } from "../lib/i18n";
 import { takeAction } from "../obr/actions";
 import { performAttack } from "../obr/attack";
-import { autoModifiers, COVER_LABEL, isRanged, netLabel, type Cover } from "../lib/modifiers";
 import type { AttackSpec } from "./AttackPanel";
 import { mechWeaponSpec, npcFeatureSpec } from "./attackSpecs";
 import { useApp } from "./AppContext";
@@ -65,13 +65,9 @@ export function BarragePanel({
   const groups = useMemo(() => barrageGroups(sheet), [sheet]);
   const targets = app.targetsFor(c.id);
   const [selected, setSelected] = useState<string[]>([]);
-  const [target, setTarget] = useState(targets[0]?.id ?? "");
-  const [perWeapon, setPerWeapon] = useState<Record<string, string>>({});
-  const [acc, setAcc] = useState(0);
-  const [diff, setDiff] = useState(0);
+  // each attack (weapon, or each shot of a weapon that attacks several times) has its own target and modifiers
+  const [rows, setRows] = useState<Record<string, TargetRow>>({});
   const [bonusDamage, setBonusDamage] = useState("");
-  const [cover, setCover] = useState<Cover>("none");
-  const [consumeLockOn, setConsumeLockOn] = useState(true);
   const [results, setResults] = useState<RollResult[]>([]);
   const [appliedIds, setAppliedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -91,7 +87,23 @@ export function BarragePanel({
     });
   };
 
-  const attacks = chosen.flatMap((g) => g.weapons.map((spec, i) => ({ id: `${g.key}:${i}`, group: g.name, spec })));
+  const attacks = chosen.flatMap((g) =>
+    g.weapons.flatMap((spec, i) => {
+      const n = Math.max(1, Math.min(6, spec.attacks ?? 1));
+      return Array.from({ length: n }, (_, k) => ({
+        id: `${g.key}:${i}:${k}`,
+        group: g.name,
+        spec,
+        label: n > 1 ? `${spec.label} (${k + 1}/${n})` : spec.label,
+      }));
+    }),
+  );
+  const rowFor = (id: string) => rows[id] ?? newTargetRow(targets[0]?.id ?? "");
+  const patchRow = (id: string, patch: Partial<TargetRow>) => setRows((rs) => ({ ...rs, [id]: { ...rowFor(id), ...patch } }));
+  useTargetArrows(
+    c,
+    attacks.map((a) => rowFor(a.id).targetId),
+  );
 
   const roll = async () => {
     setBusy(true);
@@ -104,15 +116,16 @@ export function BarragePanel({
       }
       const out: RollResult[] = [];
       for (const [i, a] of attacks.entries()) {
-        // automatic modifiers (conditions, cover, weapon tags) are applied per weapon
+        // automatic modifiers (conditions, cover, weapon tags) are applied per attack
+        const row = rowFor(a.id);
         const r = await performAttack(c.id, a.spec, {
-          targetId: perWeapon[a.id] || target || undefined,
-          manual: acc - diff,
-          cover,
-          consumeLockOn,
+          targetId: row.targetId || undefined,
+          manual: row.acc - row.diff,
+          cover: row.cover,
+          consumeLockOn: row.consumeLockOn,
           // bonus damage only on the first attack
           bonusDamage: i === 0 ? bonusDamage.trim() || undefined : undefined,
-          label: `${a.spec.label} (Rajada)`,
+          label: `${a.label} (Rajada)`,
           by: { id: app.session.playerId, name: app.session.playerName },
         });
         if (r) out.push(r);
@@ -163,69 +176,27 @@ export function BarragePanel({
         </span>
       </div>
 
-      {attacks.length > 0 && (
-        <div className="form-grid">
-          <label>Alvo</label>
-          <select value={target} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">— sem alvo —</option>
-            {targets.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-                {t.kind === "npc" ? " (NPC)" : ""}
-              </option>
-            ))}
-          </select>
-          {attacks.length > 1 &&
-            attacks.map((a) => (
-              <FragmentRow key={a.id} label={a.spec.label}>
-                <select value={perWeapon[a.id] ?? ""} onChange={(e) => setPerWeapon((p) => ({ ...p, [a.id]: e.target.value }))}>
-                  <option value="">mesmo alvo</option>
-                  {targets.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </FragmentRow>
-            ))}
-          {attacks.some((a) => isRanged(a.spec)) && (
-            <>
-              <label>Cobertura</label>
-              <select value={cover} onChange={(e) => setCover(e.target.value as Cover)}>
-                {(Object.keys(COVER_LABEL) as Cover[]).map((k) => (
-                  <option key={k} value={k}>
-                    {COVER_LABEL[k]}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-          {app.room.combatants[target]?.st?.includes("lockon") && (
-            <>
-              <label>Mira Travada</label>
-              <label className="check">
-                <input type="checkbox" checked={consumeLockOn} onChange={(e) => setConsumeLockOn(e.target.checked)} /> Consumir
-                no 1º ataque (+1 Precisão)
-              </label>
-            </>
-          )}
-          <label>Automático</label>
-          <div className="auto-mods">
-            {attacks.map((a) => {
-              const t = app.room.combatants[perWeapon[a.id] || target];
-              const mods = autoModifiers(a.spec, app.room.combatants[c.id] ?? c, t, cover, consumeLockOn).filter((m) => m.value !== 0);
-              const net = mods.reduce((x, m) => x + m.value, 0);
-              return (
-                <span key={a.id} className={`mod-chip ${net > 0 ? "acc" : net < 0 ? "diff" : ""}`} title={mods.map((m) => m.label).join(", ")}>
-                  {a.spec.label}: {netLabel(net)}
-                </span>
-              );
-            })}
+      {attacks.map((a, i) => {
+        const row = rowFor(a.id);
+        const first = attacks[0] && rowFor(attacks[0].id);
+        return (
+          <div key={a.id} className="attack-row">
+            <div className="attack-row-head">
+              {a.label}
+              {i > 0 && first?.targetId && row.targetId !== first.targetId && (
+                <button className="btn-small ghost" onClick={() => patchRow(a.id, { targetId: first.targetId })}>
+                  Mesmo alvo do 1º
+                </button>
+              )}
+            </div>
+            <div className="form-grid">
+              <TargetFields attacker={c} spec={a.spec} row={row} onChange={(p) => patchRow(a.id, p)} />
+            </div>
           </div>
-          <label>+ Precisão</label>
-          <Counter value={acc} onChange={setAcc} />
-          <label>+ Dificuldade</label>
-          <Counter value={diff} onChange={setDiff} />
+        );
+      })}
+      {attacks.some((a) => a.spec.kind === "attack") && (
+        <div className="form-grid">
           <label>Dano bônus</label>
           <input placeholder="ex.: 1d6 (só no 1º ataque)" value={bonusDamage} onChange={(e) => setBonusDamage(e.target.value)} />
         </div>
@@ -246,31 +217,6 @@ export function BarragePanel({
           }}
         />
       ))}
-    </div>
-  );
-}
-
-function FragmentRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <>
-      <label className="weapon-target" title={label}>
-        ↳ {label}
-      </label>
-      {children}
-    </>
-  );
-}
-
-function Counter({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  return (
-    <div className="stepper">
-      <button className="icon-btn" onClick={() => onChange(Math.max(0, value - 1))}>
-        −
-      </button>
-      <span className="num">{value}</span>
-      <button className="icon-btn" onClick={() => onChange(Math.min(9, value + 1))}>
-        +
-      </button>
     </div>
   );
 }
