@@ -12,6 +12,7 @@ import { SkillChecks } from "./SkillChecks";
 import { Portrait } from "./Portrait";
 import { TalentAbilities } from "./TalentAbilities";
 import { WeaponFxSelect } from "./FxControls";
+import { TurnDot } from "./TurnDot";
 import { dismount, mount } from "../obr/mount";
 import { pilotIdFor } from "../lib/pilot";
 import { BarragePanel } from "./BarragePanel";
@@ -62,7 +63,9 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
           </div>
         )}
         <div className="sheet-title-text">
-          <h2>{sheet.mech.name}</h2>
+          <h2>
+            <TurnDot c={c} /> {sheet.mech.name}
+          </h2>
           <div className="muted">
             {sheet.mech.manufacturer} {sheet.mech.frameName}
             {sheet.mech.mechtype.length ? ` · ${sheet.mech.mechtype.join("/")}` : ""}

@@ -254,6 +254,7 @@ export interface CombatantState {
   st?: string[]; // active statuses / conditions (lancer-data status ids)
   dm?: 1; // mech: the pilot dismounted (the mech is empty)
   php?: number; // mech: the pilot's HP, kept while mounted
+  ptk?: string; // mech: the pilot's token, kept while mounted (re-linked on the next dismount)
   pm?: string; // pilot: id of the mech this pilot belongs to
 }
 

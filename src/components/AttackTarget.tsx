@@ -58,6 +58,7 @@ export function TargetFields({
             <option key={t.id} value={t.id}>
               {t.name}
               {t.kind === "npc" ? " (NPC)" : t.kind === "pilot" ? " (piloto)" : ""}
+              {app.sceneReady && !t.tokenId ? " (sem token)" : ""}
             </option>
           ))}
         </select>

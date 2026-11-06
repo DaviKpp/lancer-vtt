@@ -4,6 +4,7 @@ import { sheetStore } from "../obr/sheets";
 import { useApp } from "./AppContext";
 import { StatusChips } from "./Conditions";
 import { Portrait } from "./Portrait";
+import { TurnDot } from "./TurnDot";
 import { imageFor } from "../lib/images";
 import { notify } from "../obr/toast";
 
@@ -68,6 +69,7 @@ export function CombatantCard({ c, compact }: { c: CombatantState; compact?: boo
     <div className={`combatant-card kind-${c.kind}`}>
       <button className="combatant-main" onClick={() => app.openSheet(c.id)}>
         <div className="combatant-name">
+          <TurnDot c={c} />
           <Portrait src={imageFor(c, sheet)} size={84} />
           <strong>{c.name}</strong>
           {c.tokenId && <span className="badge" title="Vinculado a um token">⛓</span>}

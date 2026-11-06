@@ -1,7 +1,9 @@
 import type { CombatantState, TurnActions } from "../lib/types";
 import { quickCap, turnSummary } from "../lib/actions";
 import { reactionBlocked } from "../lib/reactions";
-import { startTurn } from "../obr/turns";
+import { endTurn, startTurn } from "../obr/turns";
+import { notify } from "../obr/toast";
+import { turnStateOf } from "./TurnDot";
 import { useApp } from "./AppContext";
 import { patchCombatant } from "../obr/room";
 
@@ -15,6 +17,13 @@ export function TurnTracker({ c, editable, compact }: { c: CombatantState; edita
   const tk = app.room.encounter?.tk ?? 0;
   const reaction = reactionBlocked(c, undefined, tk);
   const set = (patch: Partial<TurnActions>) => editable && patchCombatant(c.id, { ac: { ...t, ...patch } });
+  const turn = turnStateOf(c, app.room.encounter, app.room.combatants);
+  const acting = turn === "acting";
+  const start = async () => {
+    await startTurn(c.id);
+    // outside an encounter there's no "whose turn" to show: say what happened
+    if (!turn) void notify(`${c.name}: ações do turno liberadas.`, "SUCCESS");
+  };
 
   return (
     <div className={`turn-tracker ${compact ? "compact" : ""}`}>
@@ -58,15 +67,21 @@ export function TurnTracker({ c, editable, compact }: { c: CombatantState; edita
       {!compact && (
         <div className="row between turn-foot">
           <span className="muted small">{turnSummary(c)}</span>
-          {editable && (
-            <button
-              className="btn-small ghost"
-              onClick={() => startTurn(c.id)}
-              title="Começa o turno deste personagem: libera movimento e ações e repõe as reações"
-            >
-              Iniciar turno
-            </button>
-          )}
+          {acting && <span className="badge badge-turn">● Turno ativo</span>}
+          {editable &&
+            (acting ? (
+              <button className="btn-small" onClick={() => void endTurn(c.id)} title="Encerra o turno e gasta a ativação desta rodada">
+                Encerrar turno
+              </button>
+            ) : (
+              <button
+                className="btn-small ghost"
+                onClick={() => void start()}
+                title="Começa o turno deste personagem: libera movimento e ações e repõe as reações"
+              >
+                {turn === "done" ? "Iniciar outro turno" : "Iniciar turno"}
+              </button>
+            ))}
         </div>
       )}
     </div>

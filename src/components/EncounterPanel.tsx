@@ -9,6 +9,7 @@ import { MiniBars } from "./CombatantList";
 import { QuickHp } from "./QuickHp";
 import { StatLine } from "./StatLine";
 import { Portrait } from "./Portrait";
+import { TurnDot } from "./TurnDot";
 import { imageFor } from "../lib/images";
 import { pilotIdFor } from "../lib/pilot";
 import { SkillChecks } from "./SkillChecks";
@@ -230,6 +231,7 @@ function EncounterRow({ c, active, onRemove }: { c: CombatantState; active: bool
       <div className="enc-top">
         <div className="enc-main">
           <button className="link-btn enc-name" onClick={() => visible && app.openSheet(c.id)} disabled={!visible}>
+            <TurnDot c={c} />
             <Portrait src={imageFor(c, sheet)} size={96} />
             <strong>{c.name}</strong>
             {c.tokenId && (

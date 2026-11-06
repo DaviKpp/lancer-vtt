@@ -16,6 +16,7 @@ export const ANNOUNCE_CHANNEL = `${ID}/announce`;
 
 export const CONTEXT_LINK_ID = `${ID}/context-link`;
 export const CONTEXT_OPEN_ID = `${ID}/context-open`;
+export const CONTEXT_TURN_ID = `${ID}/context-turn`;
 export const LINK_MODAL_ID = `${ID}/link-modal`;
 /** Metadata key on local HUD items drawn over linked tokens. */
 export const HUD_KEY = `${ID}/hud`;

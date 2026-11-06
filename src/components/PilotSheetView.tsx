@@ -11,6 +11,7 @@ import { Trackers } from "./Trackers";
 import { Conditions } from "./Conditions";
 import { LinkControls } from "./LinkControls";
 import { SkillChecks } from "./SkillChecks";
+import { TurnDot } from "./TurnDot";
 import { Portrait } from "./Portrait";
 import { TalentAbilities } from "./TalentAbilities";
 import { rangeText, Section, signed, Stat, Tags } from "./common";
@@ -34,7 +35,9 @@ export function PilotSheetView({ c, sheet, editable }: { c: CombatantState; shee
           </div>
         )}
         <div className="sheet-title-text">
-          <h2>{c.name}</h2>
+          <h2>
+            <TurnDot c={c} /> {c.name}
+          </h2>
           <div className="muted">
             {p.name} · Piloto · NL{p.level} · Grit {signed(p.grit)}
           </div>
