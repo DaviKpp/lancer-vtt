@@ -24,6 +24,8 @@ export interface GuideAction {
   desc: string;
   who: "mech" | "npc" | "both";
   run: GuideRun;
+  /** NPCs follow simpler rules for some actions (Stabilize, Ram, Improvised Attack...). */
+  npcDesc?: string;
 }
 
 export const TURN_RULES = [
@@ -114,6 +116,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         who: "both",
         run: "ram",
         desc: "Ataque corpo a corpo contra alvo adjacente do seu tamanho ou menor. No acerto ele fica Caído ou é empurrado 1 espaço.",
+        npcDesc: "Ataque corpo a corpo (+Tier) contra alvo adjacente do seu tamanho ou menor. No acerto ele fica Caído.",
       },
       {
         id: "grapple",
@@ -123,6 +126,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         who: "both",
         run: "grapple",
         desc: "Ataque corpo a corpo contra alvo adjacente. No acerto vocês ficam agarrados (engajados, sem Impulsionar); o menor fica Imobilizado.",
+        npcDesc: "Ataque corpo a corpo (+Tier) contra alvo adjacente; no acerto, agarra o alvo (mesmas regras de agarrar).",
       },
       {
         id: "hide",
@@ -209,6 +213,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         who: "both",
         run: "stabilize",
         desc: "Escolha um: resfriar (zera o calor e remove Exposto) ou gastar 1 Reparo para recuperar todo o PV. E mais um: recarregar armas Recarregáveis, remover a queimadura, ou remover uma condição sua ou de um aliado adjacente.",
+        npcDesc: "Sem escolhas: zera o calor, remove Exposto e recarrega todas as armas Recarregáveis. (NPCs não têm Reparos.)",
       },
       {
         id: "disengage",
@@ -227,6 +232,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         who: "both",
         run: "improvised",
         desc: "Ataque corpo a corpo com o que estiver à mão: 1d6 de dano cinético.",
+        npcDesc: "Ataque corpo a corpo (+Tier) com dano cinético fixo: 3 / 4 / 6 pelo Tier.",
       },
       {
         id: "activate_full",
@@ -277,6 +283,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         who: "both",
         run: "overwatch",
         desc: "Quando um hostil começa a se mover dentro da Ameaça de uma arma sua (Ameaça 1 se não indicado), faça imediatamente uma Escaramuça contra ele com essa arma, antes que ele se mova.",
+        npcDesc: "Quando um personagem começa a se mover dentro da Ameaça de uma arma do NPC, ele pode fazer uma Escaramuça contra ele. Só uma vez entre os turnos do NPC, salvo indicação.",
       },
     ],
   },

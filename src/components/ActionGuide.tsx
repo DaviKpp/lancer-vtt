@@ -50,6 +50,9 @@ export function ActionGuide({ c, sheet, editable }: { c?: CombatantState; sheet?
   const interactive = !!c && !!editable;
 
   const attackBonus = sheet?.kind === "mech" ? sheet.stats.attackBonus : sheet?.kind === "npc" ? sheet.tier : 0;
+  // NPCs use their own (simpler) versions of some actions
+  const isNpc = c?.kind === "npc" || (!c && sheet?.kind === "npc");
+  const tier = sheet?.kind === "npc" ? Math.max(1, Math.min(3, sheet.tier)) : 1;
   const techBonus = sheet?.kind === "mech" ? sheet.stats.techAttack : sheet?.kind === "npc" ? sheet.stats.techAttack : 0;
 
   const run = async (a: GuideAction) => {
@@ -73,7 +76,14 @@ export function ActionGuide({ c, sheet, editable }: { c?: CombatantState; sheet?
       case "ram":
         return setMode({
           kind: "attack",
-          spec: { kind: "attack", label: "Investida", bonus: attackBonus, accuracy: 0, cost: "quick", notes: ["No acerto: alvo fica Caído e pode ser empurrado 1 espaço"] },
+          spec: {
+            kind: "attack",
+            label: "Investida",
+            bonus: attackBonus,
+            accuracy: 0,
+            cost: "quick",
+            notes: [isNpc ? "No acerto: alvo fica Caído" : "No acerto: alvo fica Caído e pode ser empurrado 1 espaço"],
+          },
         });
       case "grapple":
         return setMode({
@@ -83,12 +93,25 @@ export function ActionGuide({ c, sheet, editable }: { c?: CombatantState; sheet?
       case "improvised":
         return setMode({
           kind: "attack",
-          spec: { kind: "attack", label: "Ataque Improvisado", bonus: attackBonus, accuracy: 0, cost: "full", damage: [{ type: "Kinetic", val: "1d6" }] },
+          spec: {
+            kind: "attack",
+            label: "Ataque Improvisado",
+            bonus: attackBonus,
+            accuracy: 0,
+            cost: "full",
+            // NPC: fixed damage by tier (3 / 4 / 6)
+            damage: [{ type: "Kinetic", val: isNpc ? String([3, 4, 6][tier - 1]) : "1d6" }],
+          },
         });
       case "lockon":
         return setMode({ kind: "lockon" });
-      case "stabilize":
-        return setMode({ kind: "stabilize" });
+      case "stabilize": {
+        if (!isNpc) return setMode({ kind: "stabilize" });
+        // NPC Stabilize has no choices: cool down and reload
+        const fresh = (await getRoomState()).combatants[c.id] ?? c;
+        await patchCombatant(c.id, { heat: 0, st: (fresh.st ?? []).filter((s) => s !== "exposed") });
+        return takeAction(fresh, "full", "Estabilizar", by, { detail: "zerou o calor, sem Exposto, recarregou as armas Recarregáveis" });
+      }
       case "hide": {
         await takeAction(c, "quick", "Esconder-se", by);
         const fresh = (await getRoomState()).combatants[c.id];
@@ -194,7 +217,8 @@ export function ActionGuide({ c, sheet, editable }: { c?: CombatantState; sheet?
                         {a.name} <span className="muted small">({a.en})</span>
                         {COST_LABEL[a.cost] && <span className={`badge cost-${a.cost}`}>{COST_LABEL[a.cost]}</span>}
                       </span>
-                      <span className="small muted">{a.desc}</span>
+                      <span className="small muted">{isNpc ? a.npcDesc ?? a.desc : a.desc}</span>
+                      {!c && !sheet && a.npcDesc && <span className="small muted npc-rule">NPC: {a.npcDesc}</span>}
                       {blocked && <span className="small warn">{blocked}</span>}
                     </div>
                     {interactive && (

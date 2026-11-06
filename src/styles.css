@@ -718,8 +718,13 @@ ul.plain {
   padding: 7px 9px;
   background: var(--card);
 }
+/* already played this round: still fully usable (reactions), just marked */
 .enc-row.done {
-  opacity: 0.55;
+  border-left-color: #e2382c;
+}
+.badge-done {
+  border-color: rgba(226, 56, 44, 0.7);
+  color: #ff8a80;
 }
 .enc-main {
   flex: 1;
@@ -1466,4 +1471,10 @@ button.tag {
 .badge-turn {
   border-color: rgba(63, 212, 107, 0.7);
   color: #6be592;
+}
+
+.npc-rule {
+  display: block;
+  margin-top: 2px;
+  color: #ff9d94;
 }

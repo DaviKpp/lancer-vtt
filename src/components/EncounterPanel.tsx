@@ -239,6 +239,11 @@ function EncounterRow({ c, active, onRemove }: { c: CombatantState; active: bool
                 ⛓
               </span>
             )}
+            {active && done && !acting && (
+              <span className="badge badge-done" title="Já jogou nesta rodada — ainda pode usar reações">
+                Turno feito
+              </span>
+            )}
           </button>
           <div className="muted small">{visible ? c.sub : c.kind === "npc" ? "Hostil" : c.ownerName}</div>
           {visible && <MiniBars c={c} />}

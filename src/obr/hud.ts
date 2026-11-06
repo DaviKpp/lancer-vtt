@@ -11,6 +11,8 @@ import type { CombatantState } from "../lib/types";
 import { activeStatuses, statusInfo } from "../lib/statuses";
 import { HUD_KEY } from "./constants";
 import { readRoomState } from "./room";
+import { TURN_COLOR, turnStateOf, type TurnState } from "../lib/turn";
+import type { EncounterState } from "../lib/types";
 
 type Role = "GM" | "PLAYER";
 type Vec = { x: number; y: number };
@@ -47,6 +49,8 @@ interface PathSpec {
   commands: PathCommand[];
   color: string;
   strokeWidth: number;
+  /** Filled shape (turn dot); without it the path is only stroked (destroyed X). */
+  fill?: string;
   z: number;
 }
 type Spec = RectSpec | TextSpec | PathSpec;
@@ -93,12 +97,38 @@ function destroyedX(c: CombatantState, b: { min: Vec; max: Vec; width: number })
   ];
 }
 
+/** Turn dot in the token's top-left corner: green = acting, yellow = still to play, red = already played. */
+function turnDot(c: CombatantState, b: { min: Vec; max: Vec }, turn: TurnState): Spec {
+  const tokenId = c.tokenId as string;
+  const size = Math.min(b.max.x - b.min.x, b.max.y - b.min.y);
+  const r = Math.max(5, size * 0.085);
+  const cx = size * 0.15;
+  const cy = size * 0.15;
+  const commands: PathCommand[] = [];
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * Math.PI * 2;
+    commands.push([i ? Command.LINE : Command.MOVE, cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+  }
+  commands.push([Command.CLOSE]);
+  return {
+    kind: "path",
+    id: `${HUD_KEY}/${tokenId}/turn`,
+    tokenId,
+    position: b.min,
+    commands,
+    color: COLORS.outline,
+    strokeWidth: Math.max(1.5, r * 0.3),
+    fill: TURN_COLOR[turn],
+    z: 6,
+  };
+}
+
 function round(v: number) {
   return Math.round(v * 10) / 10;
 }
 
 /** Builds the HUD pieces for one token. `b` is the token's bounding box. */
-function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, dpi: number, role: Role): Spec[] {
+function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, dpi: number, role: Role, turn?: TurnState): Spec[] {
   // lancers and their pilots are open to everyone; NPC numbers only to the GM
   const showNumbers = c.kind !== "npc" || role === "GM";
   const active = activeStatuses(c).map((sid) => statusInfo(sid));
@@ -111,6 +141,7 @@ function specsFor(c: CombatantState, b: { min: Vec; max: Vec; width: number }, d
   // an empty mech (pilot dismounted) says so, with the statuses
   const statuses = [c.dm ? "Sem piloto" : "", names("Status")].filter(Boolean).join(" · ");
   const out: Spec[] = isDestroyed(c) ? destroyedX(c, b) : [];
+  if (turn) out.push(turnDot(c, b, turn));
   if (!showNumbers && !conditions && !statuses) return out.map((s) => ({ ...s, position: { x: round(s.position.x), y: round(s.position.y) } }));
 
   const id = (part: string) => `${HUD_KEY}/${c.tokenId}/${part}`;
@@ -234,7 +265,8 @@ function build(s: Spec): Item {
   if (s.kind === "path") {
     return common(buildPath())
       .commands(s.commands)
-      .fillOpacity(0)
+      .fillColor(s.fill ?? "#000000")
+      .fillOpacity(s.fill ? 1 : 0)
       .strokeColor(s.color)
       .strokeOpacity(1)
       .strokeWidth(s.strokeWidth)
@@ -277,6 +309,10 @@ function applyTo(draft: any, s: Spec) {
     draft.commands = s.commands;
     draft.style.strokeWidth = s.strokeWidth;
     draft.style.strokeColor = s.color;
+    if (s.fill) {
+      draft.style.fillColor = s.fill;
+      draft.style.fillOpacity = 1;
+    }
   } else if (s.kind === "rect") {
     draft.width = s.width;
     draft.height = s.height;
@@ -296,6 +332,7 @@ function applyTo(draft: any, s: Spec) {
 export function startHud() {
   let role: Role = "PLAYER";
   let combatants: Record<string, CombatantState> = {};
+  let encounter: EncounterState | null = null;
   let sceneReady = false;
   let tokens: Item[] = [];
   const rendered = new Map<string, string>(); // id -> serialized spec
@@ -332,7 +369,7 @@ export function startHud() {
       for (const c of Object.values(combatants)) {
         if (!c.tokenId || !present.has(c.tokenId)) continue;
         const b = await OBR.scene.items.getItemBounds([c.tokenId]);
-        desired.push(...specsFor(c, b, dpi, role));
+        desired.push(...specsFor(c, b, dpi, role, turnStateOf(c, encounter, combatants)));
       }
       const want = new Map(desired.map((s) => [s.id, s]));
       const existing = new Set(
@@ -391,9 +428,9 @@ export function startHud() {
       }
     });
 
-    combatants = readRoomState(await OBR.room.getMetadata()).combatants;
+    ({ combatants, encounter } = readRoomState(await OBR.room.getMetadata()));
     OBR.room.onMetadataChange((m) => {
-      combatants = readRoomState(m).combatants;
+      ({ combatants, encounter } = readRoomState(m));
       // refresh which tokens matter, then draw
       void OBR.scene.isReady().then(async (ready) => {
         if (ready) onItems(await OBR.scene.items.getItems());
