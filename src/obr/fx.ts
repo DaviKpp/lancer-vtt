@@ -43,7 +43,7 @@ export async function playShot(attacker: CombatantState, target: CombatantState,
     style,
     hit,
     seed: Math.floor(Math.random() * 1e9),
-    look: loadFxLook(),
+    look: loadFxLook(style),
   };
   let off: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;

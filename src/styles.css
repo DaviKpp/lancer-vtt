@@ -1397,3 +1397,34 @@ button.tag {
   flex-shrink: 0;
   white-space: nowrap;
 }
+
+/* "Meus efeitos": one tab per kind of effect */
+.fx-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.fx-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  font-size: 11px;
+}
+.fx-tab.active {
+  border-color: var(--obr-primary);
+  background: rgba(187, 153, 255, 0.14);
+}
+.fx-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+.dice-custom input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}

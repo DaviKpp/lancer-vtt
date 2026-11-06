@@ -35,7 +35,15 @@ export function weaponFx(opts: { kind: "attack" | "tech"; type?: string; damage?
 export interface FxLook {
   color?: string; // #rrggbb; undefined = each effect's own colors
   scale?: number; // size multiplier
+  count?: number; // projectiles, for the styles in FX_COUNT
 }
+
+/** Styles that fire several projectiles: how many the player may choose (and the default). */
+export const FX_COUNT: Partial<Record<FxStyle, { min: number; max: number; def: number; label: string }>> = {
+  bullets: { min: 1, max: 10, def: 4, label: "Traçantes" },
+  shotgun: { min: 3, max: 14, def: 7, label: "Chumbos" },
+  missile: { min: 1, max: 8, def: 1, label: "Mísseis" },
+};
 
 export type Vec = { x: number; y: number };
 export type Cmd = ["M", number, number] | ["L", number, number] | ["Z"];
@@ -133,12 +141,19 @@ export function planFx(style: FxStyle, from: Vec, to: Vec, dpi: number, hit: boo
   const sz = dpi * Math.max(0.5, Math.min(2.5, look.scale ?? 1));
   const color = look.color && /^#[0-9a-f]{6}$/i.test(look.color) ? look.color : undefined;
   const C = (def: string) => color ?? def;
+  /** How many projectiles (for the styles that fire several), from the player's choice. */
+  const countFor = (st: FxStyle) => {
+    const r = FX_COUNT[st];
+    if (!r) return 1;
+    const n = Math.round(look.count ?? r.def);
+    return Math.max(r.min, Math.min(r.max, Number.isFinite(n) ? n : r.def));
+  };
   const L = (def: string) => (color ? shade(color, 0.55) : def);
 
 
   switch (style) {
     case "bullets":
-      return projectiles(4, 0.07, 0.11, 0.55, 0.075, C("#ffe08a"), 0.18);
+      return projectiles(countFor("bullets"), 0.07, 0.11, 0.55, 0.075, C("#ffe08a"), 0.18);
     case "shotgun":
       return shotgun();
     case "cannon":
@@ -195,7 +210,7 @@ export function planFx(style: FxStyle, from: Vec, to: Vec, dpi: number, hit: boo
 
   function shotgun(): FxPlan {
     const travel = Math.min(0.26, Math.max(0.1, dist / (dpi * 28)));
-    const pellets = Array.from({ length: 7 }, () => {
+    const pellets = Array.from({ length: countFor("shotgun") }, () => {
       const ang = (rnd() - 0.5) * 0.35; // ~±10°
       const reach = dist * (0.92 + rnd() * 0.12);
       return add(start, mul(rot(norm(sub(end, start)), ang), reach));
@@ -244,31 +259,50 @@ export function planFx(style: FxStyle, from: Vec, to: Vec, dpi: number, hit: boo
     };
   }
 
+  /** One missile, or a salvo: each flies its own arc and explodes around the target. */
   function missile(): FxPlan {
+    const n = countFor("missile");
     const travel = Math.min(0.75, Math.max(0.35, dist / (dpi * 9)));
-    const lift = Math.min(dist * 0.25, sz * 1.3) * side;
-    const pos = (k: number) => add(lerp(start, end, k), mul(nrm, Math.sin(Math.PI * k) * lift));
+    const trail = n > 3 ? 2 : 4; // shorter smoke trails for big salvos
+    const salvo = Array.from({ length: n }, (_, m) => {
+      const s = n === 1 ? side : m % 2 ? 1 : -1;
+      const lift = Math.min(dist * 0.25, sz * 1.3) * s * (n === 1 ? 1 : 0.6 + rnd() * 0.8);
+      // the impacts spread a little around the target in a salvo
+      const at = n === 1 ? end : add(end, add(mul(nrm, (rnd() - 0.5) * sz * 1.1), mul(u, (rnd() - 0.5) * sz * 0.8)));
+      return { delay: m * 0.09, lift, at };
+    });
     const boom = hit ? 0.5 : 0.4;
+    const ids = salvo.flatMap((_, m) => [
+      ...Array.from({ length: trail }, (_, j) => `s${m}_${j}`),
+      `body${m}`,
+      `fire${m}`,
+      `core${m}`,
+      `ring${m}`,
+    ]);
     return {
-      duration: travel + boom,
-      ids: ["s0", "s1", "s2", "s3", "body", "fire", "core", "ring"],
+      duration: salvo[n - 1].delay + travel + boom,
+      ids,
       at(t) {
         const out: Prim[] = [];
-        const k = t / travel;
-        if (k <= 1) {
-          for (let j = 3; j >= 0; j--) {
-            const kj = k - (j + 1) * 0.07;
-            if (kj > 0) out.push({ id: `s${j}`, cmds: circle(pos(kj), sz * (0.09 + 0.05 * j)), fill: "#c8c8c8", fillOpacity: 0.55 - 0.12 * j });
+        salvo.forEach((ms, m) => {
+          const pos = (k: number) => add(lerp(start, ms.at, k), mul(nrm, Math.sin(Math.PI * k) * ms.lift));
+          const k = (t - ms.delay) / travel;
+          if (k >= 0 && k <= 1) {
+            for (let j = trail - 1; j >= 0; j--) {
+              const kj = k - (j + 1) * 0.07;
+              if (kj > 0) out.push({ id: `s${m}_${j}`, cmds: circle(pos(kj), sz * (0.09 + 0.05 * j)), fill: "#c8c8c8", fillOpacity: 0.55 - 0.12 * j });
+            }
+            out.push({ id: `body${m}`, cmds: circle(pos(k), sz * 0.12), fill: C("#ff9b3d"), fillOpacity: 1, ...OUTLINE(sz) });
           }
-          out.push({ id: "body", cmds: circle(pos(k), sz * 0.12), fill: C("#ff9b3d"), fillOpacity: 1, ...OUTLINE(sz) });
-        }
-        const bk = (t - travel) / boom;
-        if (bk >= 0 && bk <= 1) {
-          const size = hit ? 1 : 0.6;
-          out.push({ id: "fire", cmds: circle(end, sz * 0.95 * size * easeOut(bk)), fill: C("#ff7b29"), fillOpacity: 0.9 * (1 - bk) });
-          out.push({ id: "core", cmds: circle(end, sz * 0.5 * size * easeOut(Math.min(1, bk * 1.6))), fill: L("#ffe27a"), fillOpacity: 1 - bk });
-          out.push({ id: "ring", cmds: circle(end, sz * (0.2 + 1.3 * size * easeOut(bk))), stroke: L("#ffc28a"), strokeWidth: sz * 0.06, strokeOpacity: 1 - bk, fillOpacity: 0 });
-        }
+          const bk = (t - ms.delay - travel) / boom;
+          if (bk >= 0 && bk <= 1) {
+            // a salvo's explosions are a bit smaller each
+            const size = (hit ? 1 : 0.6) * (n === 1 ? 1 : 0.75);
+            out.push({ id: `fire${m}`, cmds: circle(ms.at, sz * 0.95 * size * easeOut(bk)), fill: C("#ff7b29"), fillOpacity: 0.9 * (1 - bk) });
+            out.push({ id: `core${m}`, cmds: circle(ms.at, sz * 0.5 * size * easeOut(Math.min(1, bk * 1.6))), fill: L("#ffe27a"), fillOpacity: 1 - bk });
+            out.push({ id: `ring${m}`, cmds: circle(ms.at, sz * (0.2 + 1.3 * size * easeOut(bk))), stroke: L("#ffc28a"), strokeWidth: sz * 0.06, strokeOpacity: 1 - bk, fillOpacity: 0 });
+          }
+        });
         return out;
       },
     };

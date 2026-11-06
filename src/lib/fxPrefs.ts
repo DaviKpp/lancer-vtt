@@ -1,8 +1,10 @@
-// A player's choices for their shot animations, saved in this browser: a color and size for all
-// their shots, and which animation each weapon uses (overriding the automatic pick).
+// A player's choices for their shot animations, saved in this browser: color, size and number of
+// projectiles for each kind of effect, and which animation each weapon uses (overriding the
+// automatic pick).
 import { FX_LABEL, type FxLook, type FxStyle } from "./fxFrames";
 
-const LOOK_KEY = "lancer-vtt:fx-look";
+const LEGACY_LOOK_KEY = "lancer-vtt:fx-look"; // older single color / size for every effect
+const STYLES_KEY = "lancer-vtt:fx-styles";
 const WEAPONS_KEY = "lancer-vtt:fx-weapons";
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -23,6 +25,7 @@ export function sanitizeLook(v: unknown): FxLook {
   const out: FxLook = {};
   if (typeof l.color === "string" && HEX.test(l.color)) out.color = l.color;
   if (typeof l.scale === "number" && Number.isFinite(l.scale)) out.scale = Math.max(0.5, Math.min(2.5, l.scale));
+  if (typeof l.count === "number" && Number.isFinite(l.count)) out.count = Math.max(1, Math.min(14, Math.round(l.count)));
   return out;
 }
 
@@ -41,8 +44,27 @@ function write(key: string, value: unknown) {
   }
 }
 
-export const loadFxLook = (): FxLook => sanitizeLook(read(LOOK_KEY));
-export const saveFxLook = (look: FxLook) => write(LOOK_KEY, sanitizeLook(look));
+function loadStyleMap(): Partial<Record<FxStyle, FxLook>> {
+  const raw = read(STYLES_KEY);
+  if (!raw || typeof raw !== "object") return {};
+  const out: Partial<Record<FxStyle, FxLook>> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) if (isFxStyle(k)) out[k] = sanitizeLook(v);
+  return out;
+}
+
+/** This player's look for one kind of effect (falls back to the older single look, if any). */
+export function loadFxLook(style: FxStyle): FxLook {
+  return loadStyleMap()[style] ?? sanitizeLook(read(LEGACY_LOOK_KEY));
+}
+
+export function saveFxLook(style: FxStyle, look: FxLook) {
+  const map = loadStyleMap();
+  map[style] = sanitizeLook(look);
+  write(STYLES_KEY, map);
+}
+
+/** Whether this kind of effect has its own settings (vs. the defaults). */
+export const hasOwnFxLook = (style: FxStyle) => !!loadStyleMap()[style];
 
 /** Key of one weapon of one character, e.g. "<combatant id>:<weapon name>". */
 export const weaponFxKey = (ownerId: string, weaponName: string) => `${ownerId}:${weaponName}`;
