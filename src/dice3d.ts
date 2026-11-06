@@ -294,7 +294,8 @@ if (window.parent === window) requestAnimationFrame(frame);
 
 OBR.onReady(() => {
   inObr = true;
-  captionAllowed = !show?.byId || show.byId === OBR.player.id;
+  // the big view is the roller's own screen (decided by the background page); the box is everyone else's
+  captionAllowed = !boxed;
   document.body.addEventListener("click", close);
   if (!dice.length) close();
   else requestAnimationFrame(frame);

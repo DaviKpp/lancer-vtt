@@ -49,9 +49,10 @@ export async function throwDiceAndWait(r: RollResult, phase: DicePhase = "all"):
 
 /** Only rolls made by players are thrown on screen. Returns whether dice were thrown. */
 async function sendDice(found: DiceShow): Promise<boolean> {
-  const show: DiceShow = { ...found, set: loadDiceSet() };
   try {
     if ((await OBR.player.getRole()) !== "PLAYER") return false;
+    // the connection (not the user id) tells the roller's own tab apart, even with the same account in two tabs
+    const show: DiceShow = { ...found, set: loadDiceSet(), byConn: await OBR.player.getConnectionId() };
     await OBR.broadcast.sendMessage(DICE_CHANNEL, show, { destination: "ALL" });
     return true;
   } catch (e) {
@@ -62,7 +63,7 @@ async function sendDice(found: DiceShow): Promise<boolean> {
 
 /** Throws a sample of the player's dice on their own screen only (to try out a dice set). */
 export async function previewDice(show: DiceShow) {
-  await OBR.broadcast.sendMessage(DICE_CHANNEL, show, { destination: "LOCAL" });
+  await OBR.broadcast.sendMessage(DICE_CHANNEL, { ...show, byConn: await OBR.player.getConnectionId() }, { destination: "LOCAL" });
 }
 
 /** Background page: opens the dice popover when someone throws. */
@@ -74,7 +75,7 @@ export function listenDice() {
     const data = encodeURIComponent(JSON.stringify(show));
     // A new throw replaces the one on screen.
     await OBR.popover.close(DICE_POPOVER_ID).catch(() => undefined);
-    const mine = !show.byId || show.byId === OBR.player.id;
+    const mine = show.byConn ? show.byConn === (await OBR.player.getConnectionId()) : !show.byId || show.byId === OBR.player.id;
     if (mine) {
       // the roller: big, in the middle of the screen, with the result caption
       await OBR.popover.open({

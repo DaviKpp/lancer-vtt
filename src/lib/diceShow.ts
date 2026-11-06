@@ -19,6 +19,8 @@ export interface DiceShow {
   title: string; // "Kai (Ana)"
   /** Player who rolled: only they see the caption (everyone else already gets the general notification). */
   byId?: string;
+  /** Owlbear connection (one per open tab) the roll came from: that screen gets the big view. */
+  byConn?: string;
   label: string; // weapon / check name
   result: string; // "18 — ACERTO · 7 de dano"
   dice: ShownDie[];
