@@ -48,9 +48,39 @@
         font-size: 18px;
         font-weight: 800;
       }
+      /* other players: small framed box at the top of the screen */
+      html.boxed body {
+        position: relative;
+        box-sizing: border-box;
+        border: 3px solid #e2382c;
+        border-radius: 12px;
+        background: rgba(20, 22, 32, 0.82);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+      }
+      #who-bar {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 4px 10px;
+        background: rgba(226, 56, 44, 0.9);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
+      }
+      html.boxed #who-bar {
+        display: block;
+      }
     </style>
   </head>
   <body>
+    <div id="who-bar"></div>
     <div id="caption"><div class="who"></div><div class="result"></div></div>
     <script type="module" src="/src/dice3d.ts"></script>
   </body>

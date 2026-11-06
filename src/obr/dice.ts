@@ -9,6 +9,10 @@ import { loadDiceSet } from "../lib/diceSets";
 
 export const DICE_POPOVER_ID = `${ID}/dice`;
 const DICE_CHANNEL = `${ID}/dice`;
+// other players' dice box (top center, below Owlbear's top bar)
+const BOX_W = 400;
+const BOX_H = 230;
+const BOX_TOP = 70;
 /** The roller's dice popover says when its dice stopped (LOCAL), so the result can be revealed. */
 export const DICE_SETTLED_CHANNEL = `${ID}/dice-settled`;
 const SETTLE_TIMEOUT = 4500; // if the popover never reports (failed to open...), reveal anyway
@@ -67,19 +71,36 @@ export function listenDice() {
     const show = event.data as DiceShow;
     if (!show?.dice?.length) return;
     const [vw, vh] = await Promise.all([OBR.viewport.getWidth(), OBR.viewport.getHeight()]);
-    const width = Math.round(Math.min(vw * 0.8, 960));
-    const height = Math.round(Math.min(vh * 0.6, 520));
+    const data = encodeURIComponent(JSON.stringify(show));
     // A new throw replaces the one on screen.
     await OBR.popover.close(DICE_POPOVER_ID).catch(() => undefined);
+    const mine = !show.byId || show.byId === OBR.player.id;
+    if (mine) {
+      // the roller: big, in the middle of the screen, with the result caption
+      await OBR.popover.open({
+        id: DICE_POPOVER_ID,
+        url: `/dice.html#${data}`,
+        width: Math.round(Math.min(vw * 0.8, 960)),
+        height: Math.round(Math.min(vh * 0.6, 520)),
+        anchorReference: "POSITION",
+        anchorPosition: { left: Math.round(vw / 2), top: Math.round(vh / 2) },
+        anchorOrigin: { horizontal: "CENTER", vertical: "CENTER" },
+        transformOrigin: { horizontal: "CENTER", vertical: "CENTER" },
+        hidePaper: true,
+        disableClickAway: true,
+      });
+      return;
+    }
+    // everyone else: a small red-framed box at the top center, leaving the map free
     await OBR.popover.open({
       id: DICE_POPOVER_ID,
-      url: `/dice.html#${encodeURIComponent(JSON.stringify(show))}`,
-      width,
-      height,
+      url: `/dice.html?box=1#${data}`,
+      width: Math.round(Math.min(BOX_W, vw - 32)),
+      height: BOX_H,
       anchorReference: "POSITION",
-      anchorPosition: { left: Math.round(vw / 2), top: Math.round(vh / 2) },
-      anchorOrigin: { horizontal: "CENTER", vertical: "CENTER" },
-      transformOrigin: { horizontal: "CENTER", vertical: "CENTER" },
+      anchorPosition: { left: Math.round(vw / 2), top: BOX_TOP },
+      anchorOrigin: { horizontal: "CENTER", vertical: "TOP" },
+      transformOrigin: { horizontal: "CENTER", vertical: "TOP" },
       hidePaper: true,
       disableClickAway: true,
     });

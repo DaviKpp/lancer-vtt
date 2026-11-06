@@ -38,7 +38,10 @@ scene.environmentIntensity = 0.55;
 // Tilt the studio lights away from straight overhead: the result faces lie flat and would mirror them as white glare.
 scene.environmentRotation.set(1.1, 0.6, 0);
 const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-camera.position.set(0, 16, 1.2);
+// Other players see the dice in a small framed box (see obr/dice.ts): closer camera, bigger dice.
+const boxed = new URLSearchParams(location.search).has("box");
+if (boxed) camera.position.set(0, 9, 0.7);
+else camera.position.set(0, 16, 1.2);
 camera.lookAt(0, 0, 0);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x445066, 0.6));
@@ -194,6 +197,13 @@ const dice: Die[] = (show?.dice ?? []).map((d) => makeDie(d));
 layout(dice);
 dice.forEach((d) => scene.add(d.mesh));
 const lastDelay = Math.max(0, ...dice.map((d) => d.delay));
+
+// The framed box says who is rolling what (no result: that comes in the general notification).
+if (boxed) {
+  document.documentElement.classList.add("boxed");
+  const bar = document.getElementById("who-bar")!;
+  bar.textContent = show ? `🎲 ${show.title} · ${show.label}` : "🎲";
+}
 
 const caption = document.getElementById("caption")!;
 if (show) {
