@@ -10,6 +10,7 @@ import { ActionLine, CostBadges } from "./ActionLine";
 import { DestroyToggle } from "./DestroyToggle";
 import { SkillChecks } from "./SkillChecks";
 import { Portrait } from "./Portrait";
+import { WeaponFxSelect } from "./FxControls";
 import { ActionGuide } from "./ActionGuide";
 import { TurnTracker } from "./TurnTracker";
 import { tr } from "../lib/i18n";
@@ -107,6 +108,7 @@ export function NpcSheetView({ sheet, c, editable }: { sheet: NpcSheet; c?: Comb
                 )}
               </div>
             </div>
+            {canRoll && !f.destroyed && f.type === "weapon" && <WeaponFxSelect spec={npcFeatureSpec(f, sheet)} />}
             {f.damage.length > 0 && (
               <div className="dmg-line">
                 {f.damage.map((d, i) => (

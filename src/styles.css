@@ -1342,3 +1342,19 @@ button.tag {
 .enc-row.kind-pilot {
   border-left-color: #c9a227;
 }
+
+/* per-weapon shot animation */
+.fx-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--obr-text-2);
+  margin: 2px 0 4px;
+}
+.fx-select select {
+  font-size: 11px;
+  padding: 2px 6px;
+  min-width: 0;
+  max-width: 220px;
+}

@@ -5,6 +5,7 @@ import { listenAnnouncements } from "./obr/announce";
 import { startTargeting } from "./obr/targeting";
 import { listenDice } from "./obr/dice";
 import { startToasts } from "./obr/toast";
+import { startFx } from "./obr/fx";
 import { CONTEXT_LINK_ID, CONTEXT_OPEN_ID, LINK_KEY, LINK_MODAL_ID, OPEN_CHANNEL } from "./obr/constants";
 
 OBR.onReady(() => {
@@ -77,3 +78,6 @@ startHud();
 
 // "Escolher alvo" tool + attacker → target arrows (drawn locally, per viewer).
 startTargeting();
+
+// Shot animations (bullets, beams, missiles...) between tokens.
+startFx();

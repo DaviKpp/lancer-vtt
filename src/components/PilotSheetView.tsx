@@ -3,6 +3,7 @@ import type { CombatantState, MechSheet } from "../lib/types";
 import { tr } from "../lib/i18n";
 import { AttackPanel, type AttackSpec } from "./AttackPanel";
 import { pilotWeaponSpec } from "./attackSpecs";
+import { WeaponFxSelect } from "./FxControls";
 import { Html } from "./Html";
 import { patchCombatant } from "../obr/room";
 import { mount } from "../obr/mount";
@@ -103,6 +104,7 @@ export function PilotSheetView({ c, sheet, editable }: { c: CombatantState; shee
                 </button>
               )}
             </div>
+            {editable && <WeaponFxSelect spec={pilotWeaponSpec(w, sheet)} />}
             <Tags tags={w.tags} />
             {w.effect && <Html html={w.effect} />}
             {w.onHit && <Html html={`<b>No acerto:</b> ${w.onHit}`} />}

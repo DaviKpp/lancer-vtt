@@ -6,6 +6,9 @@ import { applyOnHit } from "./effects";
 import { getRoomState, patchCombatant } from "./room";
 import { publishRoll, rollAttack } from "./rolls";
 import { throwDiceAndWait } from "./dice";
+import { playShot } from "./fx";
+import { weaponFx } from "../lib/fxFrames";
+import { weaponFxChoice } from "../lib/fxPrefs";
 
 /** Pause between revealing the hit and throwing the damage dice. */
 const HIT_PAUSE = 900;
@@ -68,8 +71,19 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
   // Dice first: the to-hit dice, then — once the hit is revealed — the damage dice. Effects on the
   // target (conditions, heat, Lock On...) only land after that.
   const thrown = await throwDiceAndWait(r, "hit");
+  // the shot on the map: hits the target, or flies past it on a miss
+  const shot = target
+    ? await playShot(
+        attacker,
+        target,
+        // the player's pick for this weapon, else the automatic one
+        (spec.fxKey && weaponFxChoice(spec.fxKey)) || spec.fx || weaponFx({ kind: spec.kind, damage: spec.damage, melee: spec.melee }),
+        r.outcome !== "miss",
+      )
+    : false;
   if (thrown && r.outcome !== "miss" && r.damage?.length) {
-    await new Promise((res) => setTimeout(res, HIT_PAUSE)); // let everyone read the hit first
+    // let everyone read the hit first (the shot animation already gave them that moment)
+    if (!shot) await new Promise((res) => setTimeout(res, HIT_PAUSE));
     await throwDiceAndWait(r, "damage");
   }
 

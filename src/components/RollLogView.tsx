@@ -12,6 +12,7 @@ import { tr } from "../lib/i18n";
 import { useRollLog } from "../obr/hooks";
 import { useApp } from "./AppContext";
 import { DicePicker } from "./DicePicker";
+import { FxPicker } from "./FxControls";
 
 /** `onApplied` runs after the GM applies this roll's damage (used to close the attack panel). */
 export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => void }) {
@@ -216,6 +217,7 @@ export function RollLogView() {
   return (
     <div className="stack">
       {!app.isGM && <DicePicker />}
+      <FxPicker />
       <div className="row between">
         <h3>Registro de rolagens</h3>
         {entries.length > 0 && (

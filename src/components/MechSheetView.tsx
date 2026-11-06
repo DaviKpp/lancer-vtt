@@ -11,6 +11,7 @@ import { DestroyToggle } from "./DestroyToggle";
 import { SkillChecks } from "./SkillChecks";
 import { Portrait } from "./Portrait";
 import { TalentAbilities } from "./TalentAbilities";
+import { WeaponFxSelect } from "./FxControls";
 import { dismount, mount } from "../obr/mount";
 import { pilotIdFor } from "../lib/pilot";
 import { BarragePanel } from "./BarragePanel";
@@ -166,6 +167,7 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
                     </button>
                   )}
                 </div>
+                {editable && !w.destroyed && w.damage.length + w.range.length > 0 && <WeaponFxSelect spec={mechWeaponSpec(w, sheet)} />}
                 {w.damage.length > 0 && (
                   <div className="dmg-line">
                     {w.damage.map((d, i) => (

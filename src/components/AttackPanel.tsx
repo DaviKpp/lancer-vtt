@@ -10,6 +10,7 @@ import type { StatusEffect } from "../lib/types";
 import { statusInfo } from "../lib/statuses";
 import { Html } from "./Html";
 import { newTargetRow, TargetFields, useTargetArrows, type TargetRow } from "./AttackTarget";
+import type { FxStyle } from "../lib/fxFrames";
 
 export interface AttackSpec {
   kind: "attack" | "tech";
@@ -39,6 +40,10 @@ export interface AttackSpec {
   melee?: boolean;
   seeking?: boolean;
   smart?: boolean;
+  /** Animation on the map (bullets, beam, missile...); picked from the weapon when not set. */
+  fx?: FxStyle;
+  /** Key under which the player may have picked another animation for this weapon (lib/fxPrefs). */
+  fxKey?: string;
   /** Armor-piercing (AP tag): its damage ignores armor. */
   ap?: boolean;
 }
