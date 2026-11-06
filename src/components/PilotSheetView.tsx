@@ -10,6 +10,7 @@ import { mount } from "../obr/mount";
 import { Trackers } from "./Trackers";
 import { Conditions } from "./Conditions";
 import { LinkControls } from "./LinkControls";
+import { SkillChecks } from "./SkillChecks";
 import { Portrait } from "./Portrait";
 import { TalentAbilities } from "./TalentAbilities";
 import { rangeText, Section, signed, Stat, Tags } from "./common";
@@ -58,6 +59,15 @@ export function PilotSheetView({ c, sheet, editable }: { c: CombatantState; shee
       <Trackers c={c} editable={editable} onPatch={(patch) => patchCombatant(c.id, patch)} />
       <Conditions c={c} editable={editable} />
       <LinkControls c={c} editable={editable} />
+      {/* on foot, a pilot saves with 1d20 + Grit (Hull / Agility / ... are the mech's) */}
+      <div className="muted small">Salvaguardas do piloto (1d20 + Grit)</div>
+      <SkillChecks
+        c={c}
+        editable={editable}
+        values={{ hull: p.grit, agi: p.grit, sys: p.grit, eng: p.grit }}
+        savesOnly
+        bonusLabel="Grit"
+      />
 
       <Section title="Atributos do piloto">
         <div className="stat-grid">

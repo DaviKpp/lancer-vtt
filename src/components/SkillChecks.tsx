@@ -7,12 +7,30 @@ import { RollCard } from "./RollLogView";
 
 const STATS: SkillStat[] = ["hull", "agi", "sys", "eng"];
 
-/** The four mech skills, highlighted, each one rolls a check or save on click. */
-export function SkillChecks({ c, sheet, editable }: { c: CombatantState; sheet?: Sheet; editable: boolean }) {
+/**
+ * The four mech skills, highlighted, each one rolls a check or save on click.
+ * `values` overrides the bonuses (a pilot on foot saves with Grit); `savesOnly` hides checks.
+ */
+export function SkillChecks({
+  c,
+  sheet,
+  editable,
+  values: given,
+  savesOnly,
+  bonusLabel,
+}: {
+  c: CombatantState;
+  sheet?: Sheet;
+  editable: boolean;
+  values?: Record<SkillStat, number>;
+  savesOnly?: boolean;
+  /** Shown next to the bonus in the roll panel, e.g. "Grit". */
+  bonusLabel?: string;
+}) {
   const app = useApp();
-  const values = skillValues(sheet);
+  const values = given ?? skillValues(sheet);
   const [stat, setStat] = useState<SkillStat | null>(null);
-  const [kind, setKind] = useState<"check" | "save">("check");
+  const [kind, setKind] = useState<"check" | "save">(savesOnly ? "save" : "check");
   const [target, setTarget] = useState(10);
   const [acc, setAcc] = useState(0);
   const [diff, setDiff] = useState(0);
@@ -35,7 +53,7 @@ export function SkillChecks({ c, sheet, editable }: { c: CombatantState; sheet?:
             className={`skill-btn ${stat === s ? "on" : ""}`}
             disabled={!editable}
             onClick={() => open(s)}
-            title={`Teste / salvaguarda de ${SKILL_LABEL[s]}`}
+            title={savesOnly ? `Salvaguarda de ${SKILL_LABEL[s]}` : `Teste / salvaguarda de ${SKILL_LABEL[s]}`}
           >
             <span className="skill-name">{SKILL_LABEL[s]}</span>
             <span className="skill-val">{signed(values[s])}</span>
@@ -46,22 +64,27 @@ export function SkillChecks({ c, sheet, editable }: { c: CombatantState; sheet?:
         <div className="attack-panel">
           <div className="attack-head">
             <strong>
-              {kind === "save" ? "Salvaguarda" : "Teste"} de {SKILL_LABEL[stat]} ({signed(values[stat])})
+              {kind === "save" ? "Salvaguarda" : "Teste"} de {SKILL_LABEL[stat]} ({signed(values[stat])}
+              {bonusLabel ? ` ${bonusLabel}` : ""})
             </strong>
             <button className="icon-btn" onClick={() => setStat(null)} aria-label="Fechar">
               ×
             </button>
           </div>
           <div className="form-grid">
-            <label>Tipo</label>
-            <div className="row gap">
-              <label className="check">
-                <input type="radio" checked={kind === "check"} onChange={() => (setKind("check"), setTarget(10))} /> Teste
-              </label>
-              <label className="check">
-                <input type="radio" checked={kind === "save"} onChange={() => setKind("save")} /> Salvaguarda
-              </label>
-            </div>
+            {!savesOnly && (
+              <>
+                <label>Tipo</label>
+                <div className="row gap">
+                  <label className="check">
+                    <input type="radio" checked={kind === "check"} onChange={() => (setKind("check"), setTarget(10))} /> Teste
+                  </label>
+                  <label className="check">
+                    <input type="radio" checked={kind === "save"} onChange={() => setKind("save")} /> Salvaguarda
+                  </label>
+                </div>
+              </>
+            )}
             <label>{kind === "save" ? "Alvo (Salv.)" : "Dificuldade"}</label>
             <input className="num-input" type="number" value={target} onChange={(e) => setTarget(Number(e.target.value) || 0)} />
             <label>Motivo</label>
