@@ -52,6 +52,7 @@ export function mechWeaponSpec(w: SheetWeapon, sheet: MechSheet): AttackSpec {
     ap: w.tags.some((t) => t.id === "tg_ap"),
     fx: weaponFx({ kind: "attack", type: w.type, damage: w.damage, melee: w.isMelee }),
     fxKey: weaponFxKey(sheet.id, w.name),
+    range: w.range,
   };
 }
 
@@ -77,6 +78,7 @@ export function pilotWeaponSpec(w: SheetWeapon, sheet: MechSheet): AttackSpec {
     ap: w.tags.some((t) => t.id === "tg_ap"),
     fx: weaponFx({ kind: "attack", damage: w.damage, melee: w.isMelee }),
     fxKey: weaponFxKey(`${sheet.id}~p`, w.name),
+    range: w.range,
   };
 }
 
@@ -152,6 +154,7 @@ export function npcFeatureSpec(f: NpcFeatureSheet, sheet: NpcSheet): AttackSpec 
     fx: weaponFx({ kind: "attack", type: f.weaponType, damage: f.damage, melee: f.isMelee }),
     // shared by every NPC of the same class (all "Pyro" use the same choice)
     fxKey: weaponFxKey(`npc:${sheet.className || sheet.name}`, f.name),
+    range: f.range,
   };
 }
 

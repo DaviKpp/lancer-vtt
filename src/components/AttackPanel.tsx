@@ -1,15 +1,15 @@
 import { useState } from "react";
-import type { CombatantState, DamageEntry, RollResult } from "../lib/types";
+import type { CombatantState, DamageEntry, RangeEntry, RollResult } from "../lib/types";
 import { useApp } from "./AppContext";
 import { RollCard } from "./RollLogView";
 import { tr } from "../lib/i18n";
 import { COST_LABEL, type ActionCost } from "../lib/actions";
 import { takeAction } from "../obr/actions";
-import { performAttack } from "../obr/attack";
+import { performAttackOnTargets } from "../obr/attack";
 import type { StatusEffect } from "../lib/types";
 import { statusInfo } from "../lib/statuses";
 import { Html } from "./Html";
-import { newTargetRow, TargetFields, useTargetArrows, type TargetRow } from "./AttackTarget";
+import { AttackTargets, newTargetRow, toTargetInputs, useTargetArrows, type TargetRow } from "./AttackTarget";
 import type { FxStyle } from "../lib/fxFrames";
 
 export interface AttackSpec {
@@ -34,6 +34,8 @@ export interface AttackSpec {
   burn?: number;
   /** Invade: the player picks which invasion option to use. */
   invadeOptions?: InvadeOption[];
+  /** Weapon range (Blast / Burst / Line / Cone mark an area attack). */
+  range?: RangeEntry[];
   /** NPC weapons that attack several times per use: each attack rolls separately. */
   attacks?: number;
   /** Rules flags for automatic accuracy/difficulty. */
@@ -68,9 +70,9 @@ export function AttackPanel({
 }) {
   const app = useApp();
   const targets = app.targetsFor(attacker.id);
-  // NPC weapons can attack several times; each attack has its own target and modifiers.
+  // NPC weapons can attack several times; each attack has its own targets (one or more) and modifiers.
   const count = Math.max(1, Math.min(6, spec.attacks ?? 1));
-  const [rows, setRows] = useState<TargetRow[]>(() => Array.from({ length: count }, () => newTargetRow(targets[0]?.id ?? "")));
+  const [rows, setRows] = useState<TargetRow[][]>(() => Array.from({ length: count }, () => [newTargetRow(targets[0]?.id ?? "")]));
   const [bonusDamage, setBonusDamage] = useState("");
   const [results, setResults] = useState<RollResult[]>([]);
   const [appliedIds, setAppliedIds] = useState<string[]>([]);
@@ -83,14 +85,18 @@ export function AttackPanel({
     ? { ...spec, effect: `<b>${invade.name}:</b> ${invade.detail ?? ""}`, hitStatuses: invade.statuses, hitHeat: 2 }
     : spec;
 
-  const patchRow = (i: number, patch: Partial<TargetRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const setAttackRows = (i: number, list: TargetRow[]) => setRows((rs) => rs.map((r, j) => (j === i ? list : r)));
+  // the arrows go away once the attack is rolled, so the shot animation is easy to see
+  const [rolled, setRolled] = useState(false);
   useTargetArrows(
     attacker,
-    rows.map((r) => r.targetId),
+    rows.flat().map((r) => ({ targetId: r.targetId, weapon: spec.label })),
+    rolled,
   );
 
   const roll = async () => {
     setBusy(true);
+    setRolled(true);
     try {
       // Spend the action once per panel (re-rolls in the same panel don't cost again).
       if (spec.cost && !charged) {
@@ -98,18 +104,14 @@ export function AttackPanel({
         setCharged(true);
       }
       const out: RollResult[] = [];
-      for (const [i, row] of rows.entries()) {
-        const r = await performAttack(attacker.id, effective, {
-          targetId: row.targetId || undefined,
-          manual: row.acc - row.diff,
-          cover: row.cover,
-          consumeLockOn: row.consumeLockOn,
+      for (const [i, list] of rows.entries()) {
+        const rs = await performAttackOnTargets(attacker.id, effective, toTargetInputs(list), {
           // bonus damage only on the first attack
           bonusDamage: i === 0 ? bonusDamage.trim() || undefined : undefined,
           label: count > 1 ? `${spec.label} (${i + 1}/${count})` : undefined,
           by: { id: app.session.playerId, name: app.session.playerName },
         });
-        if (r) out.push(r);
+        out.push(...rs);
       }
       setResults(out);
       setAppliedIds([]);
@@ -160,7 +162,6 @@ export function AttackPanel({
           {spec.bonus >= 0 ? "+" : ""}
           {spec.bonus} {spec.kind === "tech" ? "(Ataque Tech)" : "(bônus de ataque)"}
         </span>
-        {count === 1 && <TargetFields attacker={attacker} spec={effective} row={rows[0]} onChange={(p) => patchRow(0, p)} />}
         {spec.kind === "attack" && (
           <>
             <label>Dano bônus</label>
@@ -172,20 +173,22 @@ export function AttackPanel({
           </>
         )}
       </div>
+      {count === 1 && <AttackTargets attacker={attacker} spec={effective} rows={rows[0]} onChange={(l) => setAttackRows(0, l)} />}
       {count > 1 &&
-        rows.map((row, i) => (
+        rows.map((list, i) => (
           <div key={i} className="attack-row">
             <div className="attack-row-head">
               Ataque {i + 1}
-              {i > 0 && rows[0].targetId && row.targetId !== rows[0].targetId && (
-                <button className="btn-small ghost" onClick={() => patchRow(i, { targetId: rows[0].targetId })}>
+              {i > 0 && rows[0][0]?.targetId && list[0]?.targetId !== rows[0][0].targetId && (
+                <button
+                  className="btn-small ghost"
+                  onClick={() => setAttackRows(i, [{ ...list[0], targetId: rows[0][0].targetId }, ...list.slice(1)])}
+                >
                   Mesmo alvo do 1º
                 </button>
               )}
             </div>
-            <div className="form-grid">
-              <TargetFields attacker={attacker} spec={effective} row={row} onChange={(p) => patchRow(i, p)} />
-            </div>
+            <AttackTargets attacker={attacker} spec={effective} rows={list} onChange={(l) => setAttackRows(i, l)} />
           </div>
         ))}
       {spec.damage?.length ? (

@@ -4,7 +4,7 @@ import { rollDie } from "../lib/dice";
 import { autoModifiers, defenseFor, type Cover } from "../lib/modifiers";
 import { applyOnHit } from "./effects";
 import { getRoomState, patchCombatant } from "./room";
-import { publishRoll, rollAttack } from "./rolls";
+import { publishRoll, rollAttack, rollSharedDamage, type SharedDamage } from "./rolls";
 import { throwDiceAndWait } from "./dice";
 import { playShot } from "./fx";
 import { weaponFx } from "../lib/fxFrames";
@@ -21,6 +21,51 @@ export interface AttackOptions {
   bonusDamage?: string;
   label?: string;
   by: { id: string; name: string };
+  /** Several targets: damage rolled once for all of them. */
+  sharedDamage?: SharedDamage;
+  /** Throw the damage dice (false when they were already shown for another target of the same attack). */
+  showDamageDice?: boolean;
+}
+
+/** One target of an attack, with its own modifiers. */
+export interface AttackTargetInput {
+  targetId?: string;
+  manual: number;
+  cover: Cover;
+  consumeLockOn: boolean;
+}
+
+/**
+ * An attack against one or more targets. With several (area weapons, or more than one target
+ * chosen), each target gets its own attack roll but the damage is rolled once and shared.
+ */
+export async function performAttackOnTargets(
+  attackerId: string,
+  spec: AttackSpec,
+  targets: AttackTargetInput[],
+  o: { bonusDamage?: string; label?: string; by: { id: string; name: string } },
+): Promise<RollResult[]> {
+  const list = targets.length ? targets : [{ manual: 0, cover: "none" as Cover, consumeLockOn: true }];
+  if (list.length === 1) {
+    const r = await performAttack(attackerId, spec, { ...list[0], bonusDamage: o.bonusDamage, label: o.label, by: o.by });
+    return r ? [r] : [];
+  }
+  const shared = spec.damage?.length ? rollSharedDamage(spec.damage, o.bonusDamage) : undefined;
+  const out: RollResult[] = [];
+  let damageShown = false;
+  for (const [i, t] of list.entries()) {
+    const r = await performAttack(attackerId, spec, {
+      ...t,
+      label: `${o.label ?? spec.label} · alvo ${i + 1}/${list.length}`,
+      by: o.by,
+      sharedDamage: shared,
+      showDamageDice: !damageShown,
+    });
+    if (!r) continue;
+    if (r.outcome !== "miss" && r.damage?.length) damageShown = true;
+    out.push(r);
+  }
+  return out;
 }
 
 /**
@@ -59,6 +104,7 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
     critEffect: spec.critEffect,
     notes,
     by: o.by,
+    sharedDamage: o.sharedDamage,
   });
 
   // Invisible: every attack has a 50% chance to miss outright
@@ -81,7 +127,7 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
         r.outcome !== "miss",
       )
     : false;
-  if (thrown && r.outcome !== "miss" && r.damage?.length) {
+  if (thrown && r.outcome !== "miss" && r.damage?.length && o.showDamageDice !== false) {
     // let everyone read the hit first (the shot animation already gave them that moment)
     if (!shot) await new Promise((res) => setTimeout(res, HIT_PAUSE));
     await throwDiceAndWait(r, "damage");

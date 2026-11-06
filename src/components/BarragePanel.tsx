@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { newTargetRow, TargetFields, useTargetArrows, type TargetRow } from "./AttackTarget";
+import { AttackTargets, newTargetRow, toTargetInputs, useTargetArrows, type TargetRow } from "./AttackTarget";
 import type { CombatantState, RollResult, Sheet } from "../lib/types";
 import { tr } from "../lib/i18n";
 import { takeAction } from "../obr/actions";
-import { performAttack } from "../obr/attack";
+import { performAttackOnTargets } from "../obr/attack";
 import type { AttackSpec } from "./AttackPanel";
 import { mechWeaponSpec, npcFeatureSpec } from "./attackSpecs";
 import { useApp } from "./AppContext";
@@ -66,7 +66,7 @@ export function BarragePanel({
   const targets = app.targetsFor(c.id);
   const [selected, setSelected] = useState<string[]>([]);
   // each attack (weapon, or each shot of a weapon that attacks several times) has its own target and modifiers
-  const [rows, setRows] = useState<Record<string, TargetRow>>({});
+  const [rows, setRows] = useState<Record<string, TargetRow[]>>({});
   const [bonusDamage, setBonusDamage] = useState("");
   const [results, setResults] = useState<RollResult[]>([]);
   const [appliedIds, setAppliedIds] = useState<string[]>([]);
@@ -98,15 +98,19 @@ export function BarragePanel({
       }));
     }),
   );
-  const rowFor = (id: string) => rows[id] ?? newTargetRow(targets[0]?.id ?? "");
-  const patchRow = (id: string, patch: Partial<TargetRow>) => setRows((rs) => ({ ...rs, [id]: { ...rowFor(id), ...patch } }));
+  const rowsFor = (id: string) => rows[id] ?? [newTargetRow(targets[0]?.id ?? "")];
+  const setRowsFor = (id: string, list: TargetRow[]) => setRows((rs) => ({ ...rs, [id]: list }));
+  // the arrows go away once the attacks are rolled, so the shot animations are easy to see
+  const [rolled, setRolled] = useState(false);
   useTargetArrows(
     c,
-    attacks.map((a) => rowFor(a.id).targetId),
+    attacks.flatMap((a) => rowsFor(a.id).map((r) => ({ targetId: r.targetId, weapon: a.spec.label }))),
+    rolled,
   );
 
   const roll = async () => {
     setBusy(true);
+    setRolled(true);
     try {
       if (!charged) {
         await takeAction(c, "full", "Rajada", { id: app.session.playerId, name: app.session.playerName }, {
@@ -117,18 +121,13 @@ export function BarragePanel({
       const out: RollResult[] = [];
       for (const [i, a] of attacks.entries()) {
         // automatic modifiers (conditions, cover, weapon tags) are applied per attack
-        const row = rowFor(a.id);
-        const r = await performAttack(c.id, a.spec, {
-          targetId: row.targetId || undefined,
-          manual: row.acc - row.diff,
-          cover: row.cover,
-          consumeLockOn: row.consumeLockOn,
+        const rs = await performAttackOnTargets(c.id, a.spec, toTargetInputs(rowsFor(a.id)), {
           // bonus damage only on the first attack
           bonusDamage: i === 0 ? bonusDamage.trim() || undefined : undefined,
           label: `${a.label} (Rajada)`,
           by: { id: app.session.playerId, name: app.session.playerName },
         });
-        if (r) out.push(r);
+        out.push(...rs);
       }
       setResults(out);
     } catch (e) {
@@ -177,21 +176,19 @@ export function BarragePanel({
       </div>
 
       {attacks.map((a, i) => {
-        const row = rowFor(a.id);
-        const first = attacks[0] && rowFor(attacks[0].id);
+        const list = rowsFor(a.id);
+        const first = attacks[0] && rowsFor(attacks[0].id)[0];
         return (
           <div key={a.id} className="attack-row">
             <div className="attack-row-head">
               {a.label}
-              {i > 0 && first?.targetId && row.targetId !== first.targetId && (
-                <button className="btn-small ghost" onClick={() => patchRow(a.id, { targetId: first.targetId })}>
+              {i > 0 && first?.targetId && list[0]?.targetId !== first.targetId && (
+                <button className="btn-small ghost" onClick={() => setRowsFor(a.id, [{ ...list[0], targetId: first.targetId }, ...list.slice(1)])}>
                   Mesmo alvo do 1º
                 </button>
               )}
             </div>
-            <div className="form-grid">
-              <TargetFields attacker={c} spec={a.spec} row={row} onChange={(p) => patchRow(a.id, p)} />
-            </div>
+            <AttackTargets attacker={c} spec={a.spec} rows={list} onChange={(l) => setRowsFor(a.id, l)} />
           </div>
         );
       })}

@@ -10,7 +10,13 @@ const ARROW_CHANNEL = `${ID}/arrow`;
 const ARROW_KEY = `${ID}/arrow`;
 const ARROW_TTL = 3 * 60_000;
 
-type ArrowMsg = { attackerId: string; from?: string; to?: string };
+/** labels: the weapon(s) firing along this arrow, shown above it (one per line). */
+type ArrowMsg = { attackerId: string; from?: string; to?: string; labels?: string[] };
+
+const LINE_BREAK = String.fromCharCode(10);
+
+const cleanLabels = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()).slice(0, 6).map((x) => x.slice(0, 60)) : [];
 
 // ---------------------------------------------------------------- legacy tool
 
@@ -32,8 +38,8 @@ export async function removeLegacyTargetTool() {
 // ---------------------------------------------------------------- popover side
 
 /** Shows (to everyone) an arrow from the attacker's token to the target's token. */
-export function showArrow(attackerId: string, from: string, to: string) {
-  return OBR.broadcast.sendMessage(ARROW_CHANNEL, { attackerId, from, to } satisfies ArrowMsg, { destination: "ALL" });
+export function showArrow(attackerId: string, from: string, to: string, labels: string[] = []) {
+  return OBR.broadcast.sendMessage(ARROW_CHANNEL, { attackerId, from, to, labels } satisfies ArrowMsg, { destination: "ALL" });
 }
 
 export function clearArrow(attackerId: string) {
@@ -125,6 +131,44 @@ function buildLabelItem(id: string, text: string, mid: Vector2, dpi: number): It
     .build();
 }
 
+/** Weapon names stacked above the distance label (the box grows upwards from just above it). */
+function weaponBox(mid: Vector2, dpi: number, lines: number) {
+  const dist = labelBox(mid, dpi);
+  const fontSize = Math.max(11, dpi * 0.24);
+  const width = dpi * 3.2;
+  const height = Math.max(1, lines) * fontSize * 1.3;
+  const bottom = dist.position.y + dist.height * 0.15; // tucked right above the distance number
+  return { position: { x: mid.x - width / 2, y: bottom - height }, width, height, fontSize };
+}
+
+function buildWeaponItem(id: string, labels: string[], mid: Vector2, dpi: number): Item {
+  const box = weaponBox(mid, dpi, labels.length);
+  return buildText()
+    .id(id)
+    .name("LANCER arma")
+    .position(box.position)
+    .textType("PLAIN")
+    .plainText(labels.join(LINE_BREAK))
+    .width(box.width)
+    .height(box.height)
+    .fontSize(box.fontSize)
+    .fontWeight(700)
+    .fillColor("#ffd166")
+    .strokeColor("#000000")
+    .strokeOpacity(1)
+    .strokeWidth(Math.max(2, box.fontSize * 0.16))
+    .textAlign("CENTER")
+    .textAlignVertical("BOTTOM")
+    .padding(0)
+    .lineHeight(1.3)
+    .layer("RULER")
+    .zIndex(2)
+    .locked(true)
+    .disableHit(true)
+    .metadata({ [ARROW_KEY]: true })
+    .build();
+}
+
 /** "5" in grid units, using the scene's scale (e.g. "25 ft" if the grid says 5ft). */
 async function distanceText(a: Vector2, b: Vector2) {
   const [cells, scale] = await Promise.all([OBR.scene.grid.getDistance(a, b), OBR.scene.grid.getScale()]);
@@ -134,12 +178,13 @@ async function distanceText(a: Vector2, b: Vector2) {
 }
 
 /** Adds or updates the arrow + distance label for one attacker (removes them if too short). */
-async function upsertArrow(baseId: string, a: Vector2, b: Vector2) {
+async function upsertArrow(baseId: string, a: Vector2, b: Vector2, labels: string[]) {
   const dpi = await OBR.scene.grid.getDpi();
   const arrowId = baseId;
   const labelId = `${baseId}/label`;
+  const weaponId = `${baseId}/weapon`;
   const commands = arrowCommands(a, b, dpi);
-  const existing = new Set((await OBR.scene.local.getItems([arrowId, labelId])).map((i) => i.id));
+  const existing = new Set((await OBR.scene.local.getItems([arrowId, labelId, weaponId])).map((i) => i.id));
   if (!commands) {
     if (existing.size) await OBR.scene.local.deleteItems([...existing]);
     return;
@@ -150,16 +195,23 @@ async function upsertArrow(baseId: string, a: Vector2, b: Vector2) {
   const add: Item[] = [];
   if (!existing.has(arrowId)) add.push(buildArrow(arrowId, commands, dpi));
   if (!existing.has(labelId)) add.push(buildLabelItem(labelId, text, mid, dpi));
+  if (labels.length && !existing.has(weaponId)) add.push(buildWeaponItem(weaponId, labels, mid, dpi));
+  if (!labels.length && existing.has(weaponId)) await OBR.scene.local.deleteItems([weaponId]);
   if (add.length) await OBR.scene.local.addItems(add);
 
-  const update = [arrowId, labelId].filter((id) => existing.has(id));
+  const update = [arrowId, labelId, ...(labels.length ? [weaponId] : [])].filter((id) => existing.has(id));
   if (update.length) {
     const box = labelBox(mid, dpi);
+    const wbox = weaponBox(mid, dpi, labels.length);
     await OBR.scene.local.updateItems(update, (drafts) => {
       /* eslint-disable @typescript-eslint/no-explicit-any */
       for (const d of drafts as any[]) {
         if (d.id === arrowId) d.commands = commands;
-        else {
+        else if (d.id === weaponId) {
+          d.position = wbox.position;
+          d.text.plainText = labels.join(LINE_BREAK);
+          d.text.height = wbox.height;
+        } else {
           d.position = box.position;
           d.text.plainText = text;
         }
@@ -172,7 +224,7 @@ async function upsertArrow(baseId: string, a: Vector2, b: Vector2) {
 
 /** Draws the arrows broadcast by attack panels. Call once from the background page. */
 export function startTargeting() {
-  const arrows = new Map<string, { from: string; to: string; expires: number }>();
+  const arrows = new Map<string, { from: string; to: string; labels: string[]; expires: number }>();
   let sceneReady = false;
   let drawing = false;
   let again = false;
@@ -205,7 +257,8 @@ export function startTargeting() {
         const id = `${ARROW_KEY}/${attackerId}`;
         wanted.add(id);
         wanted.add(`${id}/label`);
-        await upsertArrow(id, from, to);
+        if (a.labels.length) wanted.add(`${id}/weapon`);
+        await upsertArrow(id, from, to, a.labels);
       }
       const stale = await OBR.scene.local.getItems((i) => i.metadata[ARROW_KEY] !== undefined && !wanted.has(i.id));
       if (stale.length) await OBR.scene.local.deleteItems(stale.map((i) => i.id));
@@ -231,7 +284,7 @@ export function startTargeting() {
     OBR.broadcast.onMessage(ARROW_CHANNEL, (e) => {
       const m = e.data as ArrowMsg;
       if (!m?.attackerId) return;
-      if (m.from && m.to) arrows.set(m.attackerId, { from: m.from, to: m.to, expires: Date.now() + ARROW_TTL });
+      if (m.from && m.to) arrows.set(m.attackerId, { from: m.from, to: m.to, labels: cleanLabels(m.labels), expires: Date.now() + ARROW_TTL });
       else arrows.delete(m.attackerId);
       scheduleDraw();
     });

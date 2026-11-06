@@ -123,6 +123,33 @@ export interface AttackInput {
   critEffect?: string; // added on a critical hit
   by: { id: string; name: string };
   notes?: string[];
+  /** Attack against several targets: the damage was rolled once for all of them (rollSharedDamage). */
+  sharedDamage?: SharedDamage;
+}
+
+type RolledDamage = NonNullable<RollResult["damage"]>;
+/** One damage roll for an attack with several targets: as rolled, and the critical version. */
+export interface SharedDamage {
+  normal: RolledDamage;
+  crit: RolledDamage;
+}
+
+/**
+ * LANCER: an attack against several targets (area weapons...) rolls to hit each of them separately,
+ * but rolls damage only once. The critical version keeps the higher of two rolls, like a single crit.
+ */
+export function rollSharedDamage(damage: DamageEntry[], bonusDamage?: string): SharedDamage {
+  const exprs = [...damage.map((d) => ({ type: d.type, val: d.val })), ...(bonusDamage ? [{ type: "Bonus", val: bonusDamage }] : [])];
+  const normal = exprs.map((d) => {
+    const r = rollExpression(d.val, false);
+    return { type: d.type, amount: r.total, detail: r.detail };
+  });
+  const crit = exprs.map((d, i) => {
+    const again = rollExpression(d.val, false);
+    const best = again.total > normal[i].amount ? again : { total: normal[i].amount, detail: normal[i].detail };
+    return { type: d.type, amount: best.total, detail: `${normal[i].detail} | ${again.detail} → ${best.total}` };
+  });
+  return { normal, crit };
 }
 
 /**
@@ -143,7 +170,9 @@ export function rollAttack(input: AttackInput): RollResult {
 
   let damage: RollResult["damage"];
   const hit = outcome === undefined || outcome !== "miss";
-  if (hit && input.damage?.length) {
+  if (hit && input.sharedDamage) {
+    damage = (outcome === "crit" ? input.sharedDamage.crit : input.sharedDamage.normal).map((d) => ({ ...d }));
+  } else if (hit && input.damage?.length) {
     const crit = outcome === "crit";
     damage = input.damage.map((d) => {
       const r = rollExpression(d.val, crit);
