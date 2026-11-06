@@ -1,6 +1,6 @@
 import { useState } from "react";
 import OBR from "@owlbear-rodeo/sdk";
-import { FX_COUNT, FX_LABEL, weaponFx, type FxLook, type FxStyle } from "../lib/fxFrames";
+import { FX_COUNT, FX_LABEL, MAX_PROJECTILES, weaponFx, type FxLook, type FxStyle } from "../lib/fxFrames";
 import { isFxStyle, loadFxLook, saveFxLook, setWeaponFxChoice, SIZE_OPTIONS, weaponFxChoice } from "../lib/fxPrefs";
 import { previewShot } from "../obr/fx";
 import { notify } from "../obr/toast";
@@ -17,7 +17,7 @@ export function WeaponFxSelect({ spec }: { spec: AttackSpec }) {
   if (!key) return null;
   return (
     <label className="fx-select" title="Animação do tiro no mapa (só você muda a sua)">
-      ✨ Efeito
+      Efeito
       <select
         value={choice ?? ""}
         onChange={(e) => {
@@ -130,29 +130,46 @@ export function FxPicker() {
             {count && (
               <>
                 <label>{count.label}</label>
-                <div className="row gap">
-                  <input
-                    type="range"
-                    min={count.min}
-                    max={count.max}
-                    value={look.count ?? count.def}
-                    onChange={(e) => update({ count: Number(e.target.value) })}
-                  />
-                  <strong className="mono">{look.count ?? count.def}</strong>
-                </div>
+                <CountInput key={style} value={look.count ?? count.def} onChange={(n) => update({ count: n })} />
               </>
             )}
             <label>Testar</label>
             <button className="btn-small" onClick={() => void test()} disabled={!app.sceneReady}>
-              ✨ Testar {FX_LABEL[style]}
+              Testar {FX_LABEL[style]}
             </button>
           </div>
           <p className="muted small">
             Cada tipo de efeito tem a sua cor, tamanho e quantidade, e todos na sala veem seus tiros assim. Para trocar o efeito de
-            uma arma, use “✨ Efeito” na ficha. O teste sai do token selecionado (ou do seu) e só você vê.
+            uma arma, use “Efeito” na ficha. O teste sai do token selecionado (ou do seu) e só você vê.
           </p>
         </div>
       )}
     </div>
+  );
+}
+
+/** Number box for a count: free typing, saved when it's a whole number of at least 1. */
+function CountInput({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+  // only a technical ceiling (see MAX_PROJECTILES), no range shown to the player
+  const clamp = (n: number) => Math.max(1, Math.min(MAX_PROJECTILES, Math.round(n)));
+  return (
+    <input
+      className="num-input count-input"
+      type="number"
+      inputMode="numeric"
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        const n = Number(e.target.value);
+        if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(clamp(n));
+      }}
+      onBlur={() => {
+        const n = Number(draft);
+        const fixed = draft.trim() !== "" && Number.isFinite(n) ? clamp(n) : value;
+        setDraft(String(fixed));
+        onChange(fixed);
+      }}
+    />
   );
 }

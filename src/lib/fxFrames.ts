@@ -38,12 +38,15 @@ export interface FxLook {
   count?: number; // projectiles, for the styles in FX_COUNT
 }
 
-/** Styles that fire several projectiles: how many the player may choose (and the default). */
-export const FX_COUNT: Partial<Record<FxStyle, { min: number; max: number; def: number; label: string }>> = {
-  bullets: { min: 1, max: 10, def: 4, label: "Traçantes" },
-  shotgun: { min: 3, max: 14, def: 7, label: "Chumbos" },
-  missile: { min: 1, max: 8, def: 1, label: "Mísseis" },
+/** Styles that fire several projectiles: the player picks how many (default shown here). */
+export const FX_COUNT: Partial<Record<FxStyle, { def: number; label: string }>> = {
+  bullets: { def: 4, label: "Traçantes" },
+  shotgun: { def: 7, label: "Chumbos" },
+  missile: { def: 1, label: "Mísseis" },
 };
+
+/** Technical ceiling only (each projectile is several animated shapes on every screen). */
+export const MAX_PROJECTILES = 50;
 
 export type Vec = { x: number; y: number };
 export type Cmd = ["M", number, number] | ["L", number, number] | ["Z"];
@@ -146,7 +149,7 @@ export function planFx(style: FxStyle, from: Vec, to: Vec, dpi: number, hit: boo
     const r = FX_COUNT[st];
     if (!r) return 1;
     const n = Math.round(look.count ?? r.def);
-    return Math.max(r.min, Math.min(r.max, Number.isFinite(n) ? n : r.def));
+    return Math.max(1, Math.min(MAX_PROJECTILES, Number.isFinite(n) ? n : r.def));
   };
   const L = (def: string) => (color ? shade(color, 0.55) : def);
 
@@ -191,8 +194,10 @@ export function planFx(style: FxStyle, from: Vec, to: Vec, dpi: number, hit: boo
           const fk = (t - s.delay) / 0.09;
           if (fk >= 0 && fk <= 1) out.push({ id: `m${i}`, cmds: circle(start, sz * flash * (0.6 + 0.4 * fk)), fill: L("#fff6c8"), fillOpacity: 1 - fk });
           if (k >= 0 && k <= 1) {
-            const head = lerp(start, s.end, k);
-            const tail = add(head, mul(norm(sub(s.end, start)), -sz * length));
+            // the tail leaves from the muzzle (not the head), so a bigger tracer doesn't start inside the token
+            const dir = norm(sub(s.end, start));
+            const head = lerp(add(start, mul(dir, sz * length)), s.end, k);
+            const tail = add(head, mul(dir, -sz * length));
             out.push({ id: `p${i}`, cmds: streak(tail, head, sz * width), fill: color, fillOpacity: 1, ...OUTLINE(sz) });
           }
           // impact
@@ -226,8 +231,9 @@ export function planFx(style: FxStyle, from: Vec, to: Vec, dpi: number, hit: boo
         pellets.forEach((p, i) => {
           const k = t / travel;
           if (k <= 1) {
-            const head = lerp(start, p, k);
-            out.push({ id: `p${i}`, cmds: streak(add(head, mul(norm(sub(p, start)), -sz * 0.28)), head, sz * 0.06), fill: C("#ffe7a0"), fillOpacity: 1, ...OUTLINE(sz) });
+            const dir = norm(sub(p, start));
+            const head = lerp(add(start, mul(dir, sz * 0.28)), p, k); // tail starts at the muzzle
+            out.push({ id: `p${i}`, cmds: streak(add(head, mul(dir, -sz * 0.28)), head, sz * 0.06), fill: C("#ffe7a0"), fillOpacity: 1, ...OUTLINE(sz) });
           }
           const ik = (t - travel) / 0.25;
           if (hit && ik >= 0 && ik <= 1) out.push({ id: `i${i}`, cmds: circle(p, sz * 0.14 * easeOut(ik)), fill: L("#fff2b0"), fillOpacity: 1 - ik });

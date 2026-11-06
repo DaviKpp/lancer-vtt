@@ -1,7 +1,7 @@
 // A player's choices for their shot animations, saved in this browser: color, size and number of
 // projectiles for each kind of effect, and which animation each weapon uses (overriding the
 // automatic pick).
-import { FX_LABEL, type FxLook, type FxStyle } from "./fxFrames";
+import { FX_LABEL, MAX_PROJECTILES, type FxLook, type FxStyle } from "./fxFrames";
 
 const LEGACY_LOOK_KEY = "lancer-vtt:fx-look"; // older single color / size for every effect
 const STYLES_KEY = "lancer-vtt:fx-styles";
@@ -25,7 +25,7 @@ export function sanitizeLook(v: unknown): FxLook {
   const out: FxLook = {};
   if (typeof l.color === "string" && HEX.test(l.color)) out.color = l.color;
   if (typeof l.scale === "number" && Number.isFinite(l.scale)) out.scale = Math.max(0.5, Math.min(2.5, l.scale));
-  if (typeof l.count === "number" && Number.isFinite(l.count)) out.count = Math.max(1, Math.min(14, Math.round(l.count)));
+  if (typeof l.count === "number" && Number.isFinite(l.count)) out.count = Math.max(1, Math.min(MAX_PROJECTILES, Math.round(l.count)));
   return out;
 }
 

@@ -1428,3 +1428,7 @@ button.tag {
   flex: 1;
   min-width: 0;
 }
+
+.count-input {
+  width: 64px;
+}
