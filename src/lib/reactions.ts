@@ -53,14 +53,15 @@ export function reactionsFor(c: CombatantState, sheet?: Sheet): ReactionDef[] {
   };
   if (sheet?.kind === "mech") {
     for (const s of sheet.systems.filter((x) => !x.destroyed))
-      for (const a of s.actions) if (/reaction/i.test(a.activation ?? "")) add(a.name, a.frequency, a.detail, a.trigger);
+      for (const a of s.actions) if (/reaction/i.test(a.activation ?? "")) add(a.name, a.frequency, a.detail || s.effect, a.trigger);
     for (const m of sheet.mounts)
       for (const w of m.weapons.filter((x) => !x.destroyed))
-        for (const a of w.actions ?? []) if (/reaction/i.test(a.activation ?? "")) add(a.name, a.frequency, a.detail, a.trigger);
+        for (const a of w.actions ?? []) if (/reaction/i.test(a.activation ?? "")) add(a.name, a.frequency, a.detail || w.effect, a.trigger);
   } else if (sheet?.kind === "npc") {
     for (const f of sheet.features.filter((x) => !x.destroyed)) {
       const acts = f.actions.filter((a) => /reaction/i.test(a.activation ?? ""));
-      if (acts.length) acts.forEach((a) => add(a.name, a.frequency, a.detail, a.trigger ?? f.trigger));
+      // the effect text is often on the feature itself, not on its reaction action
+      if (acts.length) acts.forEach((a) => add(a.name, a.frequency, a.detail || f.effect, a.trigger || f.trigger));
       else if (f.type === "reaction") add(f.name, undefined, f.effect, f.trigger);
     }
   }
