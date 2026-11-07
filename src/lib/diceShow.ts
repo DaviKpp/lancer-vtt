@@ -52,6 +52,8 @@ export function diceForRoll(r: RollResult, phase: DicePhase = "all"): DiceShow |
   const toHit = phase !== "damage";
   const damage = phase !== "hit";
   if (toHit && r.d20 > 0) dice.push({ sides: 20, value: r.d20, tone: "main", kept: true });
+  // free roll of other dice (2d6, 1d3...): the player's colors, like the d20
+  if (toHit && r.freeDetail) dice.push(...diceInDetail(r.freeDetail, "main"));
 
   if (toHit && r.accDice?.length) {
     const check = r.kind === "check";

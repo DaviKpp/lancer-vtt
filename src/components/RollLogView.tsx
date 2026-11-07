@@ -11,8 +11,7 @@ import { APPLIED_NOTE, OUTCOME_PT, rollLog } from "../obr/rolls";
 import { tr } from "../lib/i18n";
 import { useRollLog } from "../obr/hooks";
 import { useApp } from "./AppContext";
-import { DicePicker } from "./DicePicker";
-import { FxPicker } from "./FxControls";
+import { FreeRoll } from "./FreeRoll";
 
 /** `onApplied` runs after the GM applies this roll's damage (used to close the attack panel). */
 export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => void }) {
@@ -69,7 +68,7 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
 
   if (r.kind === "skill") {
     return (
-      <div className={`roll-card ${r.outcome === "hit" ? "roll-hit" : "roll-miss"}`}>
+      <div className={`roll-card ${r.defense === undefined ? "roll-none" : r.outcome === "hit" ? "roll-hit" : "roll-miss"}`}>
         <div className="roll-top">
           <span className="roll-who">{r.attackerName}</span>
           <span className="roll-label">🎲 {r.label}</span>
@@ -77,11 +76,15 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
         </div>
         <div className="roll-main">
           <span className="roll-total">{r.total}</span>
-          <span className="roll-vs">contra {r.defense}</span>
-          <span className={`roll-outcome ${r.outcome}`}>{r.outcome === "hit" ? "SUCESSO" : "FALHA"}</span>
+          {r.defense !== undefined && (
+            <>
+              <span className="roll-vs">contra {r.defense}</span>
+              <span className={`roll-outcome ${r.outcome}`}>{r.outcome === "hit" ? "SUCESSO" : "FALHA"}</span>
+            </>
+          )}
         </div>
         <div className="roll-detail mono">
-          d20[{r.d20}] {r.bonus >= 0 ? "+" : "−"} {Math.abs(r.bonus)}
+          {r.freeDetail ?? `d20[${r.d20}]`} {r.bonus >= 0 ? "+" : "−"} {Math.abs(r.bonus)}
           {r.accDice.length > 0 &&
             ` ${r.netAccuracy > 0 ? "+" : "−"} ${Math.max(...r.accDice)} (${r.netAccuracy > 0 ? "prec" : "dif"} ${r.accDice.join(",")})`}
         </div>
@@ -222,8 +225,7 @@ export function RollLogView() {
   const app = useApp();
   return (
     <div className="stack">
-      {!app.isGM && <DicePicker />}
-      <FxPicker />
+      <FreeRoll />
       <div className="row between">
         <h3>Registro de rolagens</h3>
         {entries.length > 0 && (

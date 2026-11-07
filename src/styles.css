@@ -109,6 +109,7 @@ select option {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap; /* six tabs: wrap instead of overflowing the popover */
   gap: 2px;
   padding: 0 8px;
   border-bottom: 1px solid var(--line);
@@ -117,6 +118,7 @@ select option {
   background: none;
   border: none;
   padding: 8px 10px;
+  white-space: nowrap;
   color: var(--obr-text-2);
   border-bottom: 2px solid transparent;
 }
@@ -1493,4 +1495,24 @@ button.tag {
 /* lasting effects of hits taken (HitNotes) */
 .card.hit-note {
   border-left: 3px solid #e0a030;
+}
+
+/* free roll (Rolagens tab) */
+.free-roll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.free-roll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+.free-roll-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.free-roll input.invalid {
+  border-color: #e2382c;
 }

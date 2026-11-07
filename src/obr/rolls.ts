@@ -80,6 +80,11 @@ export async function publishRoll(r: RollResult, opts: { thrown?: boolean } = {}
   await OBR.broadcast.sendMessage(ROLL_CHANNEL, r, { destination: "REMOTE" });
   // The roller already read the result on the dice caption, so the general notification goes only to the others.
   const local = !thrown;
+  if (r.kind === "skill" && r.defense === undefined) {
+    // free roll (no target number)
+    await announce(`${r.attackerName}: ${r.label} = ${r.total}`, "INFO", { local });
+    return;
+  }
   if (r.kind === "skill") {
     await announce(
       `${r.attackerName}: ${r.label} ${r.total} (alvo ${r.defense}) — ${r.outcome === "hit" ? "SUCESSO" : "FALHA"}`,

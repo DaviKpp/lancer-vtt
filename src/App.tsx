@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { DicePicker } from "./components/DicePicker";
+import { FxPicker } from "./components/FxControls";
 import OBR from "@owlbear-rodeo/sdk";
 import { AppContext, computeTargets, type AppValue } from "./components/AppContext";
 import { CombatantList } from "./components/CombatantList";
@@ -17,7 +19,7 @@ import { OPEN_CHANNEL } from "./obr/constants";
 import { removeLegacyTargetTool } from "./obr/targeting";
 import { useObrSession, useObrTheme, useParty, useRoomState, useSceneReady, useSheets, useTemplates } from "./obr/hooks";
 
-type Tab = "mechs" | "npcs" | "encounter" | "guide" | "rolls";
+type Tab = "mechs" | "npcs" | "encounter" | "guide" | "rolls" | "style";
 
 export function App() {
   const session = useObrSession();
@@ -103,12 +105,14 @@ export function App() {
         { id: "encounter", label: "Encontro" },
         { id: "guide", label: "Ações" },
         { id: "rolls", label: "Rolagens" },
+        { id: "style", label: "Dados e Efeitos" },
       ]
     : [
         { id: "mechs", label: "Meus Mechs" },
         { id: "encounter", label: "Encontro" },
         { id: "guide", label: "Ações" },
         { id: "rolls", label: "Rolagens" },
+        { id: "style", label: "Dados e Efeitos" },
       ];
 
   const back = () => {
@@ -187,6 +191,12 @@ export function App() {
                 </div>
               )}
               {tab === "rolls" && <RollLogView />}
+              {tab === "style" && (
+                <div className="stack">
+                  {!isGM && <DicePicker />}
+                  <FxPicker />
+                </div>
+              )}
             </main>
           </>
         )}

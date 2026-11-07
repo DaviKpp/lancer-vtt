@@ -321,7 +321,8 @@ export interface RollResult {
   defense?: number; // evasion or edef of the target
   defenseLabel?: "Eva" | "Def-E"; // which one (Smart weapons attack E-Defense)
   ap?: boolean; // the weapon is armor-piercing (AP tag)
-  overkillHeat?: number; // Overkill tag: heat the attacker took from rerolled 1s
+  overkillHeat?: number;
+  freeDetail?: string; // free roll (Rolagens tab) of dice other than a d20: "2d6[3,5]" // Overkill tag: heat the attacker took from rerolled 1s
   outcome?: "hit" | "miss" | "crit";
   damage?: { type: string; amount: number; detail: string }[];
   notes?: string[];

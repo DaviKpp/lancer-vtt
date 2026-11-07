@@ -335,6 +335,10 @@ export function styleFromSet(set: DiceSet): DieStyle {
   return { body, ink: set.ink, inkShadow: isLight(set.ink) ? "rgba(0,0,0,0.85)" : "rgba(255,255,255,0.5)" };
 }
 
+/** Accuracy and difficulty dice are always these colors (players can't change them). */
+export const ACC_COLOR = "#008000";
+export const DIFF_COLOR = "#a80309";
+
 /** One style per kind of die. */
 export const STYLES: Record<DieTone, DieStyle> = {
   // d20: red/orange "sunset" with a glossy coat
@@ -349,34 +353,17 @@ export const STYLES: Record<DieTone, DieStyle> = {
     ink: "#ffffff",
     inkShadow: "rgba(40,0,0,0.9)",
   },
-  // accuracy: glossy green gemstone
+  // accuracy: always solid green (#008000) with white numbers
   acc: {
-    body: () =>
-      new THREE.MeshPhysicalMaterial({
-        map: canvasTexture(clouds("#1d8f63", ["rgba(120,255,200,0.35)", "rgba(0,80,50,0.5)"], 40), 23),
-        emissive: new THREE.Color("#0f5a3c"),
-        emissiveIntensity: 0.6,
-        roughness: 0.1,
-        clearcoat: 1,
-        clearcoatRoughness: 0.4,
-      }),
+    body: () => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(ACC_COLOR), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.35 }),
     ink: "#ffffff",
-    inkShadow: "rgba(0,40,25,0.9)",
+    inkShadow: "rgba(0,30,0,0.9)",
   },
-  // difficulty: dark purple nebula with stars
+  // difficulty: always solid red (#a80309) with black numbers
   diff: {
-    body: () =>
-      new THREE.MeshPhysicalMaterial({
-        map: canvasTexture(
-          both(clouds("#1a1030", ["rgba(140,60,200,0.55)", "rgba(220,70,140,0.35)", "rgba(40,80,200,0.35)"]), sparkles(140)),
-          37,
-        ),
-        roughness: 0.3,
-        clearcoat: 1,
-        clearcoatRoughness: 0.4,
-      }),
-    ink: "#ff9aa8",
-    inkShadow: "rgba(0,0,0,0.9)",
+    body: () => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(DIFF_COLOR), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.35 }),
+    ink: "#000000",
+    inkShadow: "rgba(255,170,170,0.55)",
   },
   // damage: dark speckled "galaxy" stone, like the default Owlbear set
   dmg: {
