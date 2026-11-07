@@ -6,26 +6,31 @@ import { publishRoll } from "../obr/rolls";
 import { Counter } from "./AttackTarget";
 import { useApp } from "./AppContext";
 
+/** Dice the free roll offers: coin (d2), d3, d4, d6, d10, d12, d20. */
+export const FREE_DICE = [2, 3, 4, 6, 10, 12, 20] as const;
+const DIE_LABEL: Record<number, string> = { 2: "Moeda (d2)" };
+
 /**
- * Free roll: any dice ("1d20", "2d6+1"...) + a bonus, with Accuracy / Difficulty (net d6, highest one
+ * Free roll: N of one die + a bonus, with Accuracy / Difficulty (net d6, highest one
  * added or subtracted, as in LANCER). Thrown in 3D and posted to the log like any other roll.
  */
 export function FreeRoll() {
   const app = useApp();
-  const [expr, setExpr] = useState("1d20");
+  const [sides, setSides] = useState<number>(20);
+  const [count, setCount] = useState(1);
   const [bonus, setBonus] = useState(0);
   const [acc, setAcc] = useState(0);
   const [diff, setDiff] = useState(0);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const valid = /^\s*(\d*d\d+|\d+)(\s*[+-]\s*(\d*d\d+|\d+))*\s*$/i.test(expr);
+  const valid = FREE_DICE.includes(sides as (typeof FREE_DICE)[number]) && count >= 1 && count <= 10;
 
   const roll = async () => {
     if (!valid) return;
     setBusy(true);
     try {
-      const clean = expr.replace(/\s+/g, "");
-      const single20 = /^1?d20$/i.test(clean);
+      const clean = `${count}d${sides}`;
+      const single20 = count === 1 && sides === 20;
       const d20 = single20 ? rollDie(20) : 0;
       const dice = single20 ? undefined : rollExpression(clean);
       const net = acc - diff;
@@ -58,8 +63,18 @@ export function FreeRoll() {
       <strong>Rolar dados</strong>
       <div className="free-roll-grid">
         <label>
-          <span className="muted small">Dados</span>
-          <input value={expr} onChange={(e) => setExpr(e.target.value)} placeholder="1d20" className={valid ? "" : "invalid"} />
+          <span className="muted small">Dado</span>
+          <select value={sides} onChange={(e) => setSides(Number(e.target.value))}>
+            {FREE_DICE.map((d) => (
+              <option key={d} value={d}>
+                {DIE_LABEL[d] ?? `d${d}`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="muted small">Quantidade</span>
+          <input type="number" min={1} max={10} value={count} onChange={(e) => setCount(Math.max(1, Math.min(10, Math.trunc(Number(e.target.value) || 1))))} />
         </label>
         <label>
           <span className="muted small">Bônus</span>

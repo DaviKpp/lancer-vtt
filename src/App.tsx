@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { DicePicker } from "./components/DicePicker";
+import { Dice3dToggle } from "./components/Dice3dToggle";
 import { FxPicker } from "./components/FxControls";
 import OBR from "@owlbear-rodeo/sdk";
 import { AppContext, computeTargets, type AppValue } from "./components/AppContext";
@@ -193,6 +194,7 @@ export function App() {
               {tab === "rolls" && <RollLogView />}
               {tab === "style" && (
                 <div className="stack">
+                  <Dice3dToggle />
                   {!isGM && <DicePicker />}
                   <FxPicker />
                 </div>

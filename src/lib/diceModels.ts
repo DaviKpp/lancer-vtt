@@ -19,8 +19,56 @@ export interface DieModel {
 
 // ------------------------------------------------------------------ geometry
 
+/**
+ * d10: pentagonal trapezohedron — two poles and a zigzag ring of 10 vertices; the ring height
+ * (0.10557 × the pole height, for a ring of radius 1) makes every kite face flat.
+ */
+function trapezohedron(): THREE.BufferGeometry {
+  const H = 1;
+  const a = 0.10557280900008409;
+  const top = new THREE.Vector3(0, H, 0);
+  const bottom = new THREE.Vector3(0, -H, 0);
+  const ring = (i: number, up: boolean) => {
+    const t = ((i * 72 + (up ? 0 : 36)) * Math.PI) / 180;
+    return new THREE.Vector3(Math.cos(t), up ? a : -a, Math.sin(t));
+  };
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i < 5; i++) {
+    const u0 = ring(i, true);
+    const l0 = ring(i, false);
+    const u1 = ring(i + 1, true);
+    const l1 = ring(i + 1, false);
+    pts.push(top, u0, l0, top, l0, u1); // upper kite
+    pts.push(bottom, l0, u1, bottom, u1, l1); // lower kite
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts.map((p) => p.clone().multiplyScalar(0.9)));
+  return geo;
+}
+
+/** d2: a thick 16-sided disc (caps fanned from a rim vertex, so they stay plain polygons). */
+function coin(): THREE.BufferGeometry {
+  const n = 16;
+  const r = 0.95;
+  const h = 0.13;
+  const rim = (i: number, y: number) => new THREE.Vector3(Math.cos((i / n) * Math.PI * 2) * r, y, Math.sin((i / n) * Math.PI * 2) * r);
+  const pts: THREE.Vector3[] = [];
+  for (let i = 1; i < n - 1; i++) {
+    pts.push(rim(0, h), rim(i, h), rim(i + 1, h));
+    pts.push(rim(0, -h), rim(i + 1, -h), rim(i, -h));
+  }
+  for (let i = 0; i < n; i++) {
+    pts.push(rim(i, h), rim(i, -h), rim(i + 1, -h));
+    pts.push(rim(i, h), rim(i + 1, -h), rim(i + 1, h));
+  }
+  return new THREE.BufferGeometry().setFromPoints(pts);
+}
+
 function basePolyhedron(sides: number): THREE.BufferGeometry {
   switch (sides) {
+    case 2:
+      return coin();
+    case 10:
+      return trapezohedron();
     case 4:
       return new THREE.TetrahedronGeometry(1);
     case 3:
@@ -97,6 +145,10 @@ function assignLabels(normals: THREE.Vector3[], sides: number): number[] {
     });
   } else {
     for (let i = 0; i < n; i++) labels[i] = i + 1; // d4: no opposite faces
+  }
+  if (sides === 2) {
+    // coin: heads (1) on top, tails (2) underneath, nothing on the edge
+    return normals.map((m) => (m.y > 0.9 ? 1 : m.y < -0.9 ? 2 : 0));
   }
   return sides === 3 ? labels.map((l) => Math.ceil(l / 2)) : labels;
 }

@@ -22,26 +22,28 @@ export function UsageBadge({ c, tags, uid, editable }: { c?: CombatantState; tag
     void patchCombatant(c.id, { ul: ul.length ? ul : undefined });
   };
   return (
-    <div className="row gap wrap">
+    <div className="row gap wrap usage-row">
       {max > 0 && (
-        <button
-          className={`badge badge-btn ${used >= max ? "badge-off" : ""}`}
-          disabled={!editable || used <= 0}
-          title="Limitado: os usos só voltam com um Reparo Total (clique para devolver um uso)"
-          onClick={restore}
-        >
-          Usos {Math.max(0, max - used)}/{max}
-        </button>
+        <>
+          <span className={`badge ${used >= max ? "badge-warn" : "badge-ok"}`} title="Limitado: os usos só voltam com um Reparo Total">
+            Usos {Math.max(0, max - used)}/{max}
+          </span>
+          {editable && used > 0 && (
+            <button className="btn-small usage-btn" title="Devolve um uso (correção manual)" onClick={restore}>
+              +1 uso
+            </button>
+          )}
+        </>
       )}
       {loading && (
-        <button
-          className={`badge badge-btn ${unloaded ? "badge-off" : ""}`}
-          disabled={!editable || !unloaded}
-          title={unloaded ? "Descarregada: Estabilizar recarrega (clique para recarregar)" : "Carregada"}
-          onClick={reload}
-        >
-          {unloaded ? "Descarregada" : "Carregada"}
-        </button>
+        <>
+          <span className={`badge ${unloaded ? "badge-warn" : "badge-ok"}`}>{unloaded ? "Descarregada" : "Carregada"}</span>
+          {editable && unloaded && (
+            <button className="btn-small usage-btn" title="Recarrega a arma (Estabilizar também recarrega)" onClick={reload}>
+              ⟳ Recarregar
+            </button>
+          )}
+        </>
       )}
     </div>
   );

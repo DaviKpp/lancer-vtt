@@ -1516,3 +1516,27 @@ button.tag {
 .free-roll input.invalid {
   border-color: #e2382c;
 }
+
+/* Limited / Loading (UsageBadge) */
+.badge-warn {
+  color: #e0a030;
+  border-color: #e0a030;
+}
+.usage-row {
+  align-items: center;
+}
+.btn-small.usage-btn {
+  cursor: pointer;
+  color: var(--obr-primary);
+  border-color: var(--obr-primary);
+  font-weight: 600;
+}
+.btn-small.usage-btn:hover {
+  background: var(--obr-primary);
+  color: var(--obr-primary-contrast, #fff);
+}
+
+.dice-toggle {
+  align-items: center;
+  gap: 12px;
+}

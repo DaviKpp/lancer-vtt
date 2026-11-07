@@ -19,6 +19,27 @@ const SETTLE_TIMEOUT = 4500; // if the popover never reports (failed to open...)
 const REVEAL_MARGIN = 300; // other players' popovers may start a little later than the roller's
 
 /**
+ * Each player can turn the 3D dice off on their own screen (per browser; the background page reads
+ * the same storage). The others still see this player's dice, in their box, if they have them on.
+ */
+const DICE_OFF_KEY = "lancer-vtt:dice3d-off";
+export function dice3dEnabled(): boolean {
+  try {
+    return localStorage.getItem(DICE_OFF_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+export function setDice3dEnabled(on: boolean) {
+  try {
+    if (on) localStorage.removeItem(DICE_OFF_KEY);
+    else localStorage.setItem(DICE_OFF_KEY, "1");
+  } catch {
+    // storage unavailable: stays on
+  }
+}
+
+/**
  * Throws the dice for a roll and waits until they stop, so nothing reveals the result early.
  * Returns whether dice were thrown (false: GM roll or a roll without dice — nothing to wait for).
  */
@@ -53,6 +74,11 @@ async function sendDice(found: DiceShow): Promise<boolean> {
     if ((await OBR.player.getRole()) !== "PLAYER") return false;
     // the connection (not the user id) tells the roller's own tab apart, even with the same account in two tabs
     const show: DiceShow = { ...found, set: loadDiceSet(), byConn: await OBR.player.getConnectionId() };
+    if (!dice3dEnabled()) {
+      // dice off here: the others still get them, and the result shows right away for me
+      await OBR.broadcast.sendMessage(DICE_CHANNEL, show, { destination: "REMOTE" });
+      return false;
+    }
     await OBR.broadcast.sendMessage(DICE_CHANNEL, show, { destination: "ALL" });
     return true;
   } catch (e) {
@@ -70,7 +96,7 @@ export async function previewDice(show: DiceShow) {
 export function listenDice() {
   return OBR.broadcast.onMessage(DICE_CHANNEL, async (event) => {
     const show = event.data as DiceShow;
-    if (!show?.dice?.length) return;
+    if (!show?.dice?.length || !dice3dEnabled()) return;
     const [vw, vh] = await Promise.all([OBR.viewport.getWidth(), OBR.viewport.getHeight()]);
     const data = encodeURIComponent(JSON.stringify(show));
     // A new throw replaces the one on screen.

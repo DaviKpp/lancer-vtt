@@ -110,6 +110,7 @@ function makeDie(d: ShownDie): Die {
   const faces = model.faces;
   const decals: THREE.MeshStandardMaterial[] = [];
   for (const f of faces) {
+    if (!f.label) continue; // a coin's edge has no number
     const mat = new THREE.MeshStandardMaterial({
       map: numberTexture(f.label, style),
       transparent: true,
@@ -136,8 +137,8 @@ function makeDie(d: ShownDie): Die {
   const twist = Math.atan2(decalUp.x, -decalUp.z);
   final.premultiply(new THREE.Quaternion().setFromAxisAngle(UP, twist));
 
-  // Rest height: distance from the center to the face lying on the table.
-  const radius = faces[0].center.length();
+  // Rest height: distance from the center to the plane of the face lying on the table.
+  const radius = faces[faceIdx].normal.dot(faces[faceIdx].center);
 
   return {
     mesh,
@@ -289,8 +290,8 @@ function close() {
   void OBR.popover.close(DICE_POPOVER_ID);
 }
 
-// Opened directly (outside Owlbear, e.g. to preview): just play the throw once.
-if (window.parent === window) requestAnimationFrame(frame);
+// Opened directly (outside Owlbear, e.g. to preview, or with ?preview inside another frame): play the throw once.
+if (window.parent === window || new URLSearchParams(location.search).has("preview")) requestAnimationFrame(frame);
 
 OBR.onReady(() => {
   inObr = true;
