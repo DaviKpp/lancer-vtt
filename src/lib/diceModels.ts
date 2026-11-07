@@ -336,7 +336,7 @@ export function styleFromSet(set: DiceSet): DieStyle {
 }
 
 /** Accuracy and difficulty dice are always these colors (players can't change them). */
-export const ACC_COLOR = "#008000";
+export const ACC_COLOR = "#ffffff";
 export const DIFF_COLOR = "#a80309";
 
 /** One style per kind of die. */
@@ -353,11 +353,11 @@ export const STYLES: Record<DieTone, DieStyle> = {
     ink: "#ffffff",
     inkShadow: "rgba(40,0,0,0.9)",
   },
-  // accuracy: always solid green (#008000) with white numbers
+  // accuracy: always solid white with red numbers
   acc: {
     body: () => new THREE.MeshPhysicalMaterial({ color: new THREE.Color(ACC_COLOR), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.35 }),
-    ink: "#ffffff",
-    inkShadow: "rgba(0,30,0,0.9)",
+    ink: "#a80309",
+    inkShadow: "rgba(0,0,0,0.35)",
   },
   // difficulty: always solid red (#a80309) with black numbers
   diff: {
