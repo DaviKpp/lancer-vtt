@@ -38,6 +38,12 @@ function parseFeature(entry: any, tier: number, warnings: string[]): NpcFeatureS
   const type = (FEATURE_TYPES.includes(rawType as NpcFeatureType) ? rawType : "trait") as NpcFeatureType;
   const text = (v: any) => resolveTierText(toText(v), tier);
   const weaponType = d.weapon_type ? String(d.weapon_type) : undefined;
+  // an action's own text: COMP/CON uses `detail`, some content packs `effect` or `description`
+  const actionText = (a: any) => text(a?.detail) ?? text(a?.effect) ?? text(a?.description);
+  const actionTexts = new Set((Array.isArray(d.actions) ? d.actions : []).map(actionText).filter(Boolean));
+  // the feature's text: `effect`, or (v3 data) its active effects / description — unless that is just
+  // the same text its action already shows
+  const extraText = [text(d.active_effects), text(d.description), text(d.detail)].find((x) => x && !actionTexts.has(x));
   return {
     uid: uid(),
     id,
@@ -45,7 +51,7 @@ function parseFeature(entry: any, tier: number, warnings: string[]): NpcFeatureS
     type,
     origin: d.origin,
     // Some features (mostly v3 data) have no `effect` text, only active effects and actions.
-    effect: text(d.effect) ?? (d.actions?.length ? undefined : text(d.active_effects)),
+    effect: text(d.effect) ?? extraText,
     trigger: text(d.trigger),
     tags: (Array.isArray(d.tags) ? d.tags : []).map((t: any) => {
       const val = tierValue<string | number>(t.val, tier);
@@ -74,7 +80,7 @@ function parseFeature(entry: any, tier: number, warnings: string[]): NpcFeatureS
         name: a.name ?? d.name,
         activation: a.activation,
         trigger: text(a.trigger),
-        detail: text(a.detail),
+        detail: actionText(a),
         frequency: a.frequency,
         statuses: statusesOf(a),
       })),
