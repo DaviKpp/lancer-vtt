@@ -96,7 +96,16 @@ export function Trackers({
                 (editMax && editable && r.max ? (
                   <>
                     <span className="slash">/</span>
-                    <NumberField value={max} onCommit={(v) => onPatch({ [r.max as MaxKey]: v })} />
+                    <NumberField
+                      value={max}
+                      onCommit={(v) => {
+                        const nextMax = Math.max(0, v);
+                        // full before (e.g. an Elite NPC going from 1 to 2 Structure): stays full;
+                        // otherwise the current value only drops if it's now above the maximum
+                        const cur = value >= max ? nextMax : Math.min(value, nextMax);
+                        onPatch({ [r.max as MaxKey]: nextMax, ...(r.key === "heat" ? {} : { [r.key]: cur }) });
+                      }}
+                    />
                   </>
                 ) : (
                   <span className="max">/ {max}</span>

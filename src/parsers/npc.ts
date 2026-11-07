@@ -148,6 +148,33 @@ function statsFromV3Max(max: any, fb: NpcStats): NpcStats {
   };
 }
 
+/**
+ * NPC templates change the class stats (LANCER core, NPC Templates): Elite +1 Structure / +1 Stress and
+ * two turns a round; Ultra +3 / +3 and two turns; Veteran and Commander +1 / +1; Grunt 1 HP, 1 Structure,
+ * 1 Stress. Applied when the file's stats don't include them yet (still at the class's values).
+ */
+export function applyTemplates(stats: NpcStats, base: NpcStats, templates: string[]): NpcStats {
+  const has = (re: RegExp) => templates.some((t) => re.test(t));
+  const out = { ...stats };
+  let extra = 0;
+  let turns = 0;
+  if (has(/elite/i)) (extra += 1), (turns = Math.max(turns, 2));
+  if (has(/ultra/i)) (extra += 3), (turns = Math.max(turns, 2));
+  if (has(/veteran|veterano/i)) extra += 1;
+  if (has(/commander|comandante/i)) extra += 1;
+  if (extra) {
+    if (out.structure <= base.structure) out.structure = base.structure + extra;
+    if (out.stress <= base.stress) out.stress = base.stress + extra;
+  }
+  if (turns && out.activations <= base.activations) out.activations = Math.max(out.activations, turns);
+  if (has(/grunt|recruta/i)) {
+    out.hp = 1;
+    out.structure = 1;
+    out.stress = 1;
+  }
+  return out;
+}
+
 export interface ParsedNpc {
   sheet: NpcSheet;
   initial: Partial<CombatantState>;
@@ -164,10 +191,17 @@ export function parseNpc(d: any): ParsedNpc {
   const classData = isV3 ? d.class.data ?? lookup("npcClasses", d.class.id) ?? {} : lookup("npcClasses", String(d.class)) ?? {};
   const className = classData.name ?? prettifyId(String(isV3 ? d.class.id ?? "" : d.class ?? "npc"));
 
+  const templates: string[] = (d.templates ?? []).map((t: any) => {
+    const id = typeof t === "string" ? t : t?.id;
+    return (typeof t === "object" && t?.data?.name) || lookup("npcTemplates", id)?.name || prettifyId(id ?? "template");
+  });
+  const templateKeys = [...templates, ...(d.templates ?? []).map((t: any) => String(typeof t === "string" ? t : t?.id ?? ""))];
+
   let stats: NpcStats;
   let initial: Partial<CombatantState> = {};
+  const classBase = statsFromClass(classData.stats, tier);
   if (isV3) {
-    const base = statsFromClass(classData.stats, tier);
+    const base = classBase;
     const cs = d.combat_data?.stats;
     const hasMax = cs?.max && num(cs.max.hp) > 0;
     stats = hasMax ? statsFromV3Max(cs.max, base) : base;
@@ -218,13 +252,17 @@ export function parseNpc(d: any): ParsedNpc {
     }
   }
 
+  // templates (Elite, Ultra, Veteran...) raise Structure / Stress / turns if the file doesn't already
+  const before = stats;
+  stats = applyTemplates(stats, Object.keys(classData.stats ?? {}).length ? classBase : stats, templateKeys);
+  // a fresh NPC (no current values in the file) starts with the raised maximums
+  if (initial.structure === undefined || initial.structure === before.structure) initial.structure = stats.structure;
+  if (initial.stress === undefined || initial.stress === before.stress) initial.stress = stats.stress;
+  if (stats.hp !== before.hp && (initial.hp === undefined || initial.hp > stats.hp)) initial.hp = stats.hp;
+
   const rawFeatures = isV3 ? d.features ?? [] : d.items ?? [];
   // v2 items can override the tier per feature
   const features = rawFeatures.map((f: any) => parseFeature(f, isV3 ? tier : num(f?.tier, tier), warnings));
-  const templates = (d.templates ?? []).map((t: any) => {
-    const id = typeof t === "string" ? t : t?.id;
-    return (typeof t === "object" && t?.data?.name) || lookup("npcTemplates", id)?.name || prettifyId(id ?? "template");
-  });
 
   const sheet: NpcSheet = {
     kind: "npc",
