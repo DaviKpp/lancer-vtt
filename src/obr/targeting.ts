@@ -78,9 +78,15 @@ async function footprint(b: Bounds): Promise<Vector2[]> {
     for (let y = b.min.y + inset; y <= b.max.y - inset + 0.1; y += step) points.push({ x, y });
   const snapped = await Promise.all(points.map((p) => OBR.scene.grid.snapPosition(p, 1, false, true)));
   const tol = dpi * 0.15;
+  // On a hex grid a big token is a hexagon, not a box: the cells in the box's corners aren't part of
+  // it, so keep only the cells close enough to the token's center.
+  const hex = (await OBR.scene.grid.getType()).startsWith("HEX");
+  const mid = center(b);
+  const radius = Math.min(w, h) / 2 - dpi * 0.25;
   const seen = new Map<string, Vector2>();
   for (const c of snapped) {
     if (c.x < b.min.x - tol || c.x > b.max.x + tol || c.y < b.min.y - tol || c.y > b.max.y + tol) continue;
+    if (hex && Math.hypot(c.x - mid.x, c.y - mid.y) > radius) continue;
     seen.set(`${Math.round(c.x)},${Math.round(c.y)}`, c);
   }
   const cells = seen.size ? [...seen.values()] : [center(b)];
