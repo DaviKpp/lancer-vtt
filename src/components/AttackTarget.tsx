@@ -4,7 +4,7 @@
 import { useEffect, useRef } from "react";
 import OBR from "@owlbear-rodeo/sdk";
 import type { CombatantState } from "../lib/types";
-import { autoModifiers, COVER_LABEL, defenseFor, isRanged, netLabel, type Cover } from "../lib/modifiers";
+import { attackBlockers, autoModifiers, COVER_LABEL, defenseFor, isAreaAttack, isRanged, netLabel, type Cover } from "../lib/modifiers";
 import type { AttackSpec } from "./AttackPanel";
 import { useApp } from "./AppContext";
 import { notify } from "../obr/toast";
@@ -98,6 +98,13 @@ export function TargetFields({
           </span>
         ))}
         {def.note && <span className="mod-chip">{def.note}</span>}
+        {Object.values(attackBlockers(spec, current, target))
+          .filter(Boolean)
+          .map((msg) => (
+            <span key={msg} className="mod-chip diff">
+              {msg}
+            </span>
+          ))}
       </div>
       <label>+ Precisão</label>
       <Counter value={row.acc} onChange={(acc) => onChange({ acc })} />
@@ -165,7 +172,7 @@ export const toTargetInputs = (rows: TargetRow[]) =>
   rows.map((r) => ({ targetId: r.targetId || undefined, manual: r.acc - r.diff, cover: r.cover, consumeLockOn: r.consumeLockOn }));
 
 /** Weapons whose range is an area (Blast, Burst, Line, Cone) usually hit several targets. */
-export const isAreaAttack = (spec: AttackSpec) => (spec.range ?? []).some((r) => /blast|burst|line|cone/i.test(r.type));
+export { isAreaAttack } from "../lib/modifiers";
 
 /**
  * All the targets of one attack. "+ Alvo" adds another target (area weapons, or any attack that

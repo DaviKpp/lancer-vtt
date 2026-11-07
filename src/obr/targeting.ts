@@ -1,5 +1,9 @@
 // Attacker → target arrow, with the distance between them in the middle.
 //
+// LANCER measures range between the closest spaces of the two characters: a SIZE 2-4 token
+// occupies several spaces, so the arrow goes from the attacker's nearest space to the target's
+// nearest space (on its edge), not center to center.
+//
 // While an attack panel has a target, the popover broadcasts the arrow to ALL players; every
 // background page draws it as local items (nothing is stored in the scene) and keeps it on the
 // tokens when they move. It goes away when the attack panel closes (or after a safety timeout).
@@ -52,6 +56,52 @@ const RED = "#e2382c";
 
 function center(b: { min: Vector2; max: Vector2 }): Vector2 {
   return { x: (b.min.x + b.max.x) / 2, y: (b.min.y + b.max.y) / 2 };
+}
+
+type Bounds = { min: Vector2; max: Vector2 };
+
+/** Spaces (cell centers) a token covers, by snapping points spread over its bounds to the grid. */
+const footprintCache = new Map<string, Vector2[]>();
+async function footprint(b: Bounds): Promise<Vector2[]> {
+  const key = [b.min.x, b.min.y, b.max.x, b.max.y].map((v) => Math.round(v)).join(",");
+  const cached = footprintCache.get(key);
+  if (cached) return cached;
+  const dpi = await OBR.scene.grid.getDpi();
+  const w = b.max.x - b.min.x;
+  const h = b.max.y - b.min.y;
+  // small tokens (SIZE 1/2 and 1) sit in one space
+  if (w < dpi * 1.5 && h < dpi * 1.5) return [center(b)];
+  const inset = dpi * 0.2;
+  const step = dpi / 3;
+  const points: Vector2[] = [];
+  for (let x = b.min.x + inset; x <= b.max.x - inset + 0.1; x += step)
+    for (let y = b.min.y + inset; y <= b.max.y - inset + 0.1; y += step) points.push({ x, y });
+  const snapped = await Promise.all(points.map((p) => OBR.scene.grid.snapPosition(p, 1, false, true)));
+  const tol = dpi * 0.15;
+  const seen = new Map<string, Vector2>();
+  for (const c of snapped) {
+    if (c.x < b.min.x - tol || c.x > b.max.x + tol || c.y < b.min.y - tol || c.y > b.max.y + tol) continue;
+    seen.set(`${Math.round(c.x)},${Math.round(c.y)}`, c);
+  }
+  const cells = seen.size ? [...seen.values()] : [center(b)];
+  if (footprintCache.size > 200) footprintCache.clear();
+  footprintCache.set(key, cells);
+  return cells;
+}
+
+/** The two closest spaces between two tokens (where range is measured from and to). */
+function closestPair(a: Vector2[], b: Vector2[]): { from: Vector2; to: Vector2 } {
+  let best = { from: a[0], to: b[0] };
+  let bestD = Infinity;
+  for (const p of a)
+    for (const q of b) {
+      const d = (p.x - q.x) ** 2 + (p.y - q.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = { from: p, to: q };
+      }
+    }
+  return best;
 }
 
 /** Filled arrow polygon from `a` to `b` (absolute coordinates; the item sits at 0,0). */
@@ -229,9 +279,9 @@ export function startTargeting() {
   let drawing = false;
   let again = false;
 
-  const tokenCenter = async (tokenId: string) => {
+  const tokenCells = async (tokenId: string) => {
     try {
-      return center(await OBR.scene.items.getItemBounds([tokenId]));
+      return await footprint(await OBR.scene.items.getItemBounds([tokenId]));
     } catch {
       return undefined; // token deleted
     }
@@ -252,8 +302,9 @@ export function startTargeting() {
           arrows.delete(attackerId);
           continue;
         }
-        const [from, to] = await Promise.all([tokenCenter(a.from), tokenCenter(a.to)]);
-        if (!from || !to) continue;
+        const [fromCells, toCells] = await Promise.all([tokenCells(a.from), tokenCells(a.to)]);
+        if (!fromCells?.length || !toCells?.length) continue;
+        const { from, to } = closestPair(fromCells, toCells);
         const id = `${ARROW_KEY}/${attackerId}`;
         wanted.add(id);
         wanted.add(`${id}/label`);

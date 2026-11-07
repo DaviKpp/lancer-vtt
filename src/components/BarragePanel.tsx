@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { AttackTargets, newTargetRow, toTargetInputs, useTargetArrows, type TargetRow } from "./AttackTarget";
 import type { CombatantState, RollResult, Sheet } from "../lib/types";
 import { tr } from "../lib/i18n";
-import { takeAction } from "../obr/actions";
-import { performAttackOnTargets } from "../obr/attack";
+import { confirmAction, confirmIssues, takeAction } from "../obr/actions";
+import { attackBlockers } from "../lib/modifiers";
+import { afterWeaponUse, performAttackOnTargets } from "../obr/attack";
+import { usageIssues } from "../lib/usage";
 import type { AttackSpec } from "./AttackPanel";
 import { mechWeaponSpec, npcFeatureSpec } from "./attackSpecs";
 import { useApp } from "./AppContext";
@@ -109,6 +111,22 @@ export function BarragePanel({
   );
 
   const roll = async () => {
+    // Warn about anything irregular (full action used, Jammed, Hidden targets...) and let the player decide.
+    const me = app.room.combatants[c.id] ?? c;
+    const blockers = Array.from(
+      new Set(
+        attacks
+          .flatMap((a) => rowsFor(a.id).map((r) => attackBlockers(a.spec, me, app.room.combatants[r.targetId])))
+          .flatMap((b) => Object.values(b))
+          .filter((x): x is string => !!x),
+      ),
+    );
+    const extra = [
+      ...blockers,
+      ...attacks.flatMap((a) => usageIssues(me, a.spec, rowsFor(a.id).map((r) => app.room.combatants[r.targetId]))),
+    ];
+    const ok = !charged ? await confirmAction(c, "full", "Rajada", extra) : confirmIssues("Rajada", extra);
+    if (!ok) return;
     setBusy(true);
     setRolled(true);
     try {
@@ -119,15 +137,18 @@ export function BarragePanel({
         setCharged(true);
       }
       const out: RollResult[] = [];
+      // bonus damage goes on one primary attack: Auxiliary weapons fired alongside never deal it
+      const bonusAt = attacks.findIndex((a) => !a.spec.auxiliary);
       for (const [i, a] of attacks.entries()) {
         // automatic modifiers (conditions, cover, weapon tags) are applied per attack
         const rs = await performAttackOnTargets(c.id, a.spec, toTargetInputs(rowsFor(a.id)), {
-          // bonus damage only on the first attack
-          bonusDamage: i === 0 ? bonusDamage.trim() || undefined : undefined,
+          bonusDamage: i === bonusAt ? bonusDamage.trim() || undefined : undefined,
           label: `${a.label} (Rajada)`,
           by: { id: app.session.playerId, name: app.session.playerName },
+          ignoreBlockers: blockers.length > 0,
         });
         out.push(...rs);
+        await afterWeaponUse(c.id, a.spec, rs, { id: app.session.playerId, name: app.session.playerName });
       }
       setResults(out);
     } catch (e) {
@@ -195,7 +216,12 @@ export function BarragePanel({
       {attacks.some((a) => a.spec.kind === "attack") && (
         <div className="form-grid">
           <label>Dano bônus</label>
-          <input placeholder="ex.: 1d6 (só no 1º ataque)" value={bonusDamage} onChange={(e) => setBonusDamage(e.target.value)} />
+          <input
+            placeholder="ex.: 1d6 (1º ataque não-Auxiliar)"
+            title="Vai no primeiro ataque que não seja de arma Auxiliar; armas Auxiliares não causam dano bônus"
+            value={bonusDamage}
+            onChange={(e) => setBonusDamage(e.target.value)}
+          />
         </div>
       )}
 

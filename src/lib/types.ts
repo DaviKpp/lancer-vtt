@@ -244,7 +244,7 @@ export interface CombatantState {
   used: number; // activations used this round
   tpl?: string; // NPC template id this instance was spawned from
   ac?: TurnActions; // actions spent this turn
-  ocn?: number; // overcharges used this scene (heat cost escalates)
+  ocn?: number; // overcharges used since the last Full Repair (heat cost escalates)
   rx?: { tk: number; n: number }; // reactions used during turn `tk` of the encounter
   ru?: Record<string, number>; // uses of each reaction since the start of this character's turn
   br?: 1 | 2; // Brace: 1 = braced, waiting for next turn; 2 = in the restricted turn after bracing
@@ -254,16 +254,37 @@ export interface CombatantState {
   st?: string[]; // active statuses / conditions (lancer-data status ids)
   dm?: 1; // mech: the pilot dismounted (the mech is empty)
   php?: number; // mech: the pilot's HP, kept while mounted
+  bl?: 1 | 2; // Bolstered: +2 on the next skill check or save (1 = waiting for its next turn, 2 = in it)
+  jk?: string; // pilot on foot: the mech it is jockeying (climbed onto)
+  ej?: 1; // mech: the pilot ejected (single use until the next Full Repair; the mech stays Impaired)
   ptk?: string; // mech: the pilot's token, kept while mounted (re-linked on the next dismount)
   pm?: string; // pilot: id of the mech this pilot belongs to
+  bio?: 1; // NPC with the Biological tag: immune to tech actions (except Scan / Lock On), no tech actions
+  nts?: HitNote[]; // lasting effects of hits taken, shown on the sheet (lib/hitNotes.ts)
+  lu?: Record<string, number>; // Limited X: uses spent per weapon/system uid (back with a Full Repair)
+  ul?: string[]; // Loading weapons fired and not reloaded yet (uid); Stabilize reloads
+  rc?: Record<string, number>; // NPC Recharge features used and waiting: feature uid -> target number (e.g. 5 for 5+)
 }
 
 /** Actions spent in the current turn. Short keys: room metadata is size-limited. */
+/** A lasting effect a hit left on this character (it can't be automated, so it's a note). */
+export interface HitNote {
+  id: string;
+  what: string; // the weapon / ability that caused it
+  src: string; // attacker's name
+  srcId?: string;
+  html: string; // the effect text
+  until: "start" | "end" | "scene" | "manual";
+  who?: string; // whose turn ends it (combatant id)
+  started?: boolean; // "end" notes: that turn has started, so its end removes the note
+}
+
 export interface TurnActions {
   q?: number; // quick actions used
   f?: boolean; // full action used
   m?: boolean; // standard move used
   o?: boolean; // overcharged this turn
+  n?: string[]; // names of the actions taken this turn (the same action can't be repeated)
 }
 
 export interface EncounterState {
@@ -300,6 +321,7 @@ export interface RollResult {
   defense?: number; // evasion or edef of the target
   defenseLabel?: "Eva" | "Def-E"; // which one (Smart weapons attack E-Defense)
   ap?: boolean; // the weapon is armor-piercing (AP tag)
+  overkillHeat?: number; // Overkill tag: heat the attacker took from rerolled 1s
   outcome?: "hit" | "miss" | "crit";
   damage?: { type: string; amount: number; detail: string }[];
   notes?: string[];

@@ -2,6 +2,10 @@ import type { CombatantState, RollResult, Sheet } from "../lib/types";
 import { rollAccuracy, rollDie } from "../lib/dice";
 import { uid } from "../lib/util";
 import { publishRoll } from "./rolls";
+import { getRoomState, patchCombatant } from "./room";
+
+/** Name of the sheet note shown while a character is Bolstered. */
+export const BOLSTER_NOTE = "Reforçar";
 
 export type SkillStat = "hull" | "agi" | "sys" | "eng";
 
@@ -44,7 +48,9 @@ export async function rollSkill(
   const net = mods.reduce((a, m) => a + m.value, 0) + o.manual;
   const d20 = rollDie(20);
   const acc = rollAccuracy(net);
-  const total = d20 + value + acc.mod;
+  // Bolster: +2 on the next skill check or save, then it's used up
+  const bolster = c.bl ? 2 : 0;
+  const total = d20 + value + acc.mod + bolster;
   const success = !autoFail && total >= o.target;
   const r: RollResult = {
     id: uid(),
@@ -62,8 +68,17 @@ export async function rollSkill(
     total,
     defense: o.target,
     outcome: success ? "hit" : "miss",
-    notes: [...mods.map((m) => `${m.label} (${m.value > 0 ? "+" : ""}${m.value})`), ...(autoFail ? [autoFail] : [])],
+    notes: [
+      ...mods.map((m) => `${m.label} (${m.value > 0 ? "+" : ""}${m.value})`),
+      ...(bolster ? ["Reforçado (+2)"] : []),
+      ...(autoFail ? [autoFail] : []),
+    ],
   };
   await publishRoll(r);
+  if (bolster) {
+    const fresh = (await getRoomState()).combatants[c.id] ?? c;
+    const nts = (fresh.nts ?? []).filter((n) => n.what !== BOLSTER_NOTE);
+    await patchCombatant(c.id, { bl: undefined, nts: nts.length ? nts : undefined });
+  }
   return r;
 }

@@ -5,11 +5,15 @@ import { RollCard } from "./RollLogView";
 import { tr } from "../lib/i18n";
 import { COST_LABEL, type ActionCost } from "../lib/actions";
 import { takeAction } from "../obr/actions";
-import { performAttackOnTargets } from "../obr/attack";
+import { afterWeaponUse, performAttackOnTargets } from "../obr/attack";
+import { usageIssues } from "../lib/usage";
 import type { StatusEffect } from "../lib/types";
 import { statusInfo } from "../lib/statuses";
 import { Html } from "./Html";
 import { AttackTargets, newTargetRow, toTargetInputs, useTargetArrows, type TargetRow } from "./AttackTarget";
+import { attackBlockers } from "../lib/modifiers";
+import { confirmAction, confirmIssues } from "../obr/actions";
+import { markRechargeUsed, rechargeIssues, type RechargeInfo } from "../obr/recharge";
 import type { FxStyle } from "../lib/fxFrames";
 
 export interface AttackSpec {
@@ -42,12 +46,34 @@ export interface AttackSpec {
   melee?: boolean;
   seeking?: boolean;
   smart?: boolean;
+  /** NPC Recharge feature: used up until it recharges (obr/recharge.ts). */
+  recharge?: RechargeInfo;
+  /** Improvised Attack, Grapple or Ram: still allowed while Jammed. */
+  basic?: boolean;
+  /** Auxiliary weapon: never deals bonus damage when it fires alongside others (Skirmish / Barrage). */
+  auxiliary?: boolean;
   /** Animation on the map (bullets, beam, missile...); picked from the weapon when not set. */
   fx?: FxStyle;
   /** Key under which the player may have picked another animation for this weapon (lib/fxPrefs). */
   fxKey?: string;
   /** Armor-piercing (AP tag): its damage ignores armor. */
   ap?: boolean;
+  /** Overkill: damage dice that come up 1 are rerolled, 1 heat to the attacker each. */
+  overkill?: boolean;
+  /** Heat X (Self): the attacker takes X heat right after using it. */
+  heatSelf?: number;
+  /** Limited X: X uses until the next Full Repair. */
+  limited?: { uid: string; max: number };
+  /** Loading: must be reloaded (Stabilize) after each use; the weapon's uid. */
+  loading?: string;
+  /** Ordnance: only before moving or taking other actions; not vs adjacent characters; no Overwatch. */
+  ordnance?: boolean;
+  /** Danger Zone: only while at half heat cap or more. */
+  dangerZone?: boolean;
+  /** Archaic (pilot weapon): can't hurt mechs. */
+  archaic?: boolean;
+  /** Ram: only targets of this SIZE or smaller (the attacker's). */
+  maxTargetSize?: number;
 }
 
 export interface InvadeOption {
@@ -94,7 +120,41 @@ export function AttackPanel({
     rolled,
   );
 
+  /** Ram only works on characters the same SIZE as the attacker or smaller. */
+  const sizeIssues = (s: AttackSpec, ids: string[]): string[] => {
+    if (s.maxTargetSize === undefined) return [];
+    return ids.flatMap((id) => {
+      const t = app.room.combatants[id];
+      const sh = app.sheetFor(id);
+      const size = t?.kind === "pilot" ? 0.5 : sh?.kind === "mech" || sh?.kind === "npc" ? sh.stats.size : undefined;
+      return size !== undefined && size > s.maxTargetSize!
+        ? [`${t?.name ?? "Alvo"} é maior (Tamanho ${size}) que você (Tamanho ${s.maxTargetSize}): Investida só contra alvos do mesmo tamanho ou menores`]
+        : [];
+    });
+  };
+
   const roll = async () => {
+    // Warn about anything irregular (action already used, Jammed, Hidden target...) and let the player decide.
+    const me = app.room.combatants[attacker.id] ?? attacker;
+    const blockers = Array.from(
+      new Set(
+        rows
+          .flat()
+          .flatMap((r) => Object.values(attackBlockers(effective, me, app.room.combatants[r.targetId])))
+          .filter((x): x is string => !!x),
+      ),
+    );
+    const extra = [
+      ...blockers,
+      ...rechargeIssues(me, spec.recharge, spec.label),
+      ...usageIssues(me, spec, rows.flat().map((r) => app.room.combatants[r.targetId])),
+      ...sizeIssues(spec, rows.flat().map((r) => r.targetId)),
+    ];
+    const ok =
+      spec.cost && !charged
+        ? await confirmAction(attacker, spec.cost, spec.costLabel ?? spec.label, extra)
+        : confirmIssues(spec.label, extra);
+    if (!ok) return;
     setBusy(true);
     setRolled(true);
     try {
@@ -110,11 +170,14 @@ export function AttackPanel({
           bonusDamage: i === 0 ? bonusDamage.trim() || undefined : undefined,
           label: count > 1 ? `${spec.label} (${i + 1}/${count})` : undefined,
           by: { id: app.session.playerId, name: app.session.playerName },
+          ignoreBlockers: blockers.length > 0,
         });
         out.push(...rs);
       }
       setResults(out);
       setAppliedIds([]);
+      await markRechargeUsed(attacker.id, spec.recharge);
+      await afterWeaponUse(attacker.id, spec, out, { id: app.session.playerId, name: app.session.playerName });
     } finally {
       setBusy(false);
     }

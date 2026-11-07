@@ -4,6 +4,7 @@ import { applyHeat } from "../lib/rules";
 import { statusInfo } from "../lib/statuses";
 import { getRoomState, patchCombatant } from "./room";
 import { patchWithChecks } from "./checks";
+import { noteFromHit } from "../lib/hitNotes";
 
 /** Effects whose text gives the target a choice can't be applied automatically. */
 const CHOICE = /\bchoose|chooses|choice|escolh/i;
@@ -15,7 +16,8 @@ const CHOICE = /\bchoose|chooses|choice|escolh/i;
  */
 export async function applyOnHit(r: RollResult, spec: AttackSpec): Promise<RollResult> {
   if (!r.targetId || r.outcome === "miss" || r.outcome === undefined) return r;
-  const target = (await getRoomState()).combatants[r.targetId];
+  const { combatants } = await getRoomState();
+  const target = combatants[r.targetId];
   if (!target) return r;
 
   const statuses: StatusEffect[] = [...(spec.hitStatuses ?? []), ...(r.outcome === "crit" ? spec.critStatuses ?? [] : [])];
@@ -39,7 +41,15 @@ export async function applyOnHit(r: RollResult, spec: AttackSpec): Promise<RollR
     next.burn = (next.burn ?? 0) + burn;
     applied.push(`+${burn} de queimadura marcada (total ${next.burn})`);
   }
-  if (applied.length) {
+  // a lasting effect ("until the start of its next turn...") becomes a note on the target's sheet
+  const attacker = combatants[r.attackerId ?? ""];
+  const note = attacker && r.effect ? noteFromHit(attacker, target, spec.label, r.effect, r.id) : null;
+  if (note) {
+    const others = (target.nts ?? []).filter((n) => !(n.srcId === note.srcId && n.what === note.what));
+    await patchCombatant(target.id, { nts: [...others, note] });
+    applied.push("efeito duradouro anotado na ficha do alvo");
+  }
+  if (applied.length && (auto.length || spec.hitHeat || burn > 0)) {
     await patchWithChecks(
       target,
       { st: next.st, heat: next.heat, stress: next.stress, burn: next.burn },

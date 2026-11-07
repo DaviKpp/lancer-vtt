@@ -4,10 +4,31 @@ import type { AttackSpec, InvadeOption } from "./AttackPanel";
 import { reliableValue } from "./common";
 import { weaponFx } from "../lib/fxFrames";
 import { weaponFxKey } from "../lib/fxPrefs";
+import { rechargeTarget } from "../obr/recharge";
 
 function tagValue(tags: TagEntry[], id: string): number | undefined {
   const n = Number(tags.find((t) => t.id === id)?.val);
   return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * Weapon tags the attack flow enforces or tracks (LANCER core, Tags): Overkill, Heat X (Self),
+ * Limited X, Loading, Ordnance, Danger Zone, Archaic, Knockback X.
+ */
+export function tagRules(tags: TagEntry[], uid: string): Partial<AttackSpec> {
+  const has = (id: string) => tags.some((t) => t.id === id);
+  const limited = tagValue(tags, "tg_limited");
+  const knockback = tagValue(tags, "tg_knockback");
+  return {
+    overkill: has("tg_overkill") || undefined,
+    heatSelf: tagValue(tags, "tg_heat_self"),
+    limited: limited ? { uid, max: limited } : undefined,
+    loading: has("tg_loading") ? uid : undefined,
+    ordnance: has("tg_ordnance") || undefined,
+    dangerZone: has("tg_danger_zone") || undefined,
+    archaic: has("tg_archaic") || undefined,
+    notes: knockback ? [`Empurrão ${knockback}: no acerto, o alvo pode ser empurrado ${knockback} espaço(s) para longe`] : undefined,
+  };
 }
 
 /** Invade option available to everyone. */
@@ -52,12 +73,18 @@ export function mechWeaponSpec(w: SheetWeapon, sheet: MechSheet): AttackSpec {
     ap: w.tags.some((t) => t.id === "tg_ap"),
     fx: weaponFx({ kind: "attack", type: w.type, damage: w.damage, melee: w.isMelee }),
     fxKey: weaponFxKey(sheet.id, w.name),
+    auxiliary: /aux/i.test(w.mount),
     range: w.range,
+    ...tagRules(w.tags, w.uid),
   };
 }
 
-/** Pilot on foot: "Lutar" (Fight) is a full action — one attack with a pilot weapon, Grit as the bonus. */
+/**
+ * Pilot on foot: "Lutar" (Fight) is a full action — one attack with a pilot weapon, Grit as the bonus.
+ * Sidearm weapons can Fight as a quick action instead.
+ */
 export function pilotWeaponSpec(w: SheetWeapon, sheet: MechSheet): AttackSpec {
+  const sidearm = w.tags.some((t) => t.id === "tg_sidearm");
   return {
     kind: "attack",
     label: w.name,
@@ -70,8 +97,8 @@ export function pilotWeaponSpec(w: SheetWeapon, sheet: MechSheet): AttackSpec {
     critEffect: w.onCrit,
     hitStatuses: w.hitStatuses,
     critStatuses: w.critStatuses,
-    cost: "full",
-    costLabel: "Lutar",
+    cost: sidearm ? "quick" : "full",
+    costLabel: sidearm ? "Lutar (Arma Secundária)" : "Lutar",
     melee: w.isMelee,
     seeking: w.tags.some((t) => t.id === "tg_seeking"),
     smart: w.tags.some((t) => t.id === "tg_smart"),
@@ -79,7 +106,19 @@ export function pilotWeaponSpec(w: SheetWeapon, sheet: MechSheet): AttackSpec {
     fx: weaponFx({ kind: "attack", damage: w.damage, melee: w.isMelee }),
     fxKey: weaponFxKey(`${sheet.id}~p`, w.name),
     range: w.range,
+    ...tagRules(w.tags, w.uid),
   };
+}
+
+/** NPC Invade (core p.280): Systems vs E-Defense; on a hit, 2 heat and Impaired until the end of the target's next turn. */
+export const NPC_INVADE: InvadeOption = {
+  name: "Invadir (NPC)",
+  detail: "O alvo fica Prejudicado até o fim do próximo turno dele.",
+  statuses: [{ id: "impaired" }],
+};
+
+export function npcInvadeSpec(sheet: NpcSheet): AttackSpec {
+  return { kind: "tech", label: "Invadir", bonus: sheet.stats.sys, accuracy: 0, cost: "quick", costLabel: "Invadir", invadeOptions: [NPC_INVADE] };
 }
 
 /** Generic tech attack = Invade: pick Fragment Signal or a system's invasion option. */
@@ -129,6 +168,7 @@ export function npcFeatureSpec(f: NpcFeatureSheet, sheet: NpcSheet): AttackSpec 
       effect: f.effect && f.actions.length ? `${f.effect}<br>${effect ?? ""}` : effect,
       hitStatuses: [...(statuses ?? []), ...(f.hitStatuses ?? [])].length ? [...(statuses ?? []), ...(f.hitStatuses ?? [])] : undefined,
       critStatuses: f.critStatuses,
+      recharge: rechargeTarget(f.tags) ? { uid: f.uid, target: rechargeTarget(f.tags)! } : undefined,
     };
   }
   const superheavy = /superheavy/i.test(f.weaponType ?? "");
@@ -152,9 +192,11 @@ export function npcFeatureSpec(f: NpcFeatureSheet, sheet: NpcSheet): AttackSpec 
     smart: f.tags.some((t) => t.id === "tg_smart"),
     ap: f.tags.some((t) => t.id === "tg_ap"),
     fx: weaponFx({ kind: "attack", type: f.weaponType, damage: f.damage, melee: f.isMelee }),
+    recharge: rechargeTarget(f.tags) ? { uid: f.uid, target: rechargeTarget(f.tags)! } : undefined,
     // shared by every NPC of the same class (all "Pyro" use the same choice)
     fxKey: weaponFxKey(`npc:${sheet.className || sheet.name}`, f.name),
     range: f.range,
+    ...tagRules(f.tags, f.uid),
   };
 }
 

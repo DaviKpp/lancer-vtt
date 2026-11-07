@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { HitNotes } from "./HitNotes";
+import { UsageBadge } from "./UsageBadge";
 import type { CombatantState, MechSheet } from "../lib/types";
 import { patchCombatant } from "../obr/room";
 import { AttackPanel, type AttackSpec } from "./AttackPanel";
@@ -18,7 +20,7 @@ import { pilotIdFor } from "../lib/pilot";
 import { BarragePanel } from "./BarragePanel";
 import { ActionGuide } from "./ActionGuide";
 import { TurnTracker } from "./TurnTracker";
-import { takeAction } from "../obr/actions";
+import { confirmAction, takeAction } from "../obr/actions";
 import { costFromActivation, COST_LABEL } from "../lib/actions";
 import { useApp } from "./AppContext";
 import { tr } from "../lib/i18n";
@@ -98,6 +100,13 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
             <button className="btn-small ghost" onClick={() => void dismount(c, sheet, by)} title="Ação Inteira: o piloto sai do mech">
               🧍 Desmontar
             </button>
+            <button
+              className="btn-small ghost"
+              onClick={() => void dismount(c, sheet, by, { eject: true })}
+              title="Ação Rápida: o piloto voa 6 espaços; o mech fica Prejudicado e não ejeta de novo até o Reparo Total"
+            >
+              Ejetar
+            </button>
           </div>
         )
       )}
@@ -128,6 +137,8 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
           <Stat label="Bônus Limitado" value={s.limitedBonus} />
         </div>
       </Section>
+
+      <HitNotes c={c} editable={editable} />
 
       <Section title="Montagens e Armas">
         {sheet.mounts.length === 0 && <p className="muted">Nenhuma arma equipada.</p>}
@@ -186,6 +197,7 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
                   </div>
                 )}
                 <Tags tags={w.tags} />
+                <UsageBadge c={c} tags={w.tags} uid={w.uid} editable={editable} />
                 <Html html={w.effect} />
                 {w.onAttack && <Html html={`<b>Ao atacar:</b> ${w.onAttack}`} />}
                 {w.onHit && <Html html={`<b>No acerto:</b> ${w.onHit}`} />}
@@ -265,8 +277,11 @@ export function MechSheetView({ sheet, c, editable }: { sheet: MechSheet; c: Com
             {editable && (
               <button
                 className="btn-primary"
-                disabled={!c.core}
                 onClick={async () => {
+                  const cost = costFromActivation(sheet.core?.activation);
+                  const name = `Poder do Núcleo: ${sheet.core?.activeName}`;
+                  const extra = c.core ? [] : ["O Poder do Núcleo já foi usado (1 por missão, até um Reparo Total)"];
+                  if (!(await confirmAction(c, cost, name, extra))) return;
                   await patchCombatant(c.id, { core: false });
                   await takeAction(c, costFromActivation(sheet.core?.activation), `Poder do Núcleo: ${sheet.core?.activeName}`, {
                     id: app.session.playerId,

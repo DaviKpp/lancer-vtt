@@ -1478,3 +1478,19 @@ button.tag {
   margin-top: 2px;
   color: #ff9d94;
 }
+
+.guide-buttons {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.badge-btn {
+  cursor: pointer;
+  background: none;
+}
+
+/* lasting effects of hits taken (HitNotes) */
+.card.hit-note {
+  border-left: 3px solid #e0a030;
+}

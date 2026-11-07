@@ -14,6 +14,12 @@ export type GuideRun =
   | "stabilize"
   | "overcharge"
   | "overwatch"
+  | "shutdown"
+  | "bootup"
+  | "eject"
+  | "bolster"
+  | "search"
+  | "scan"
   | "log";
 
 export interface GuideAction {
@@ -80,6 +86,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         who: "both",
         run: "invade",
         desc: "Tech Rápida: ataque tech contra um alvo nos Sensores. No acerto, ele recebe 2 de calor e um efeito de invasão (ex.: Fragmentar Sinal — Prejudicado e Lento até o fim do próximo turno).",
+        npcDesc: "Tech Rápida: Sistemas contra a Defesa-E de um alvo nos Sensores. No acerto, ele recebe 2 de calor e fica Prejudicado até o fim do próximo turno.",
       },
       {
         id: "lockon",
@@ -96,7 +103,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         en: "Scan",
         cost: "quick",
         who: "both",
-        run: "log",
+        run: "scan",
         desc: "Tech Rápida: descubra atributos, armas, sistemas ou uma informação oculta de um alvo nos Sensores.",
       },
       {
@@ -105,7 +112,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         en: "Bolster",
         cost: "quick",
         who: "both",
-        run: "log",
+        run: "bolster",
         desc: "Tech Rápida: um aliado nos Sensores ganha +2 Precisão no próximo teste de perícia ou salvaguarda.",
       },
       {
@@ -116,7 +123,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         who: "both",
         run: "ram",
         desc: "Ataque corpo a corpo contra alvo adjacente do seu tamanho ou menor. No acerto ele fica Caído ou é empurrado 1 espaço.",
-        npcDesc: "Ataque corpo a corpo (+Tier) contra alvo adjacente do seu tamanho ou menor. No acerto ele fica Caído.",
+        npcDesc: "Ataque corpo a corpo (+Tier) contra alvo adjacente do seu tamanho ou menor. No acerto ele fica Caído e pode ser empurrado até 1 espaço.",
       },
       {
         id: "grapple",
@@ -135,7 +142,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         cost: "quick",
         who: "both",
         run: "hide",
-        desc: "Sem estar Engajado e fora da linha de visão (ou totalmente coberto), fica Oculto. Atacar, Impulsionar ou perder a cobertura revela você.",
+        desc: "Sem estar Engajado e fora da linha de visão (ou totalmente coberto; Invisível sempre pode), fica Oculto. Atacar, forçar salvaguardas, reagir, Impulsionar ou perder a cobertura revela você.",
       },
       {
         id: "search",
@@ -143,7 +150,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         en: "Search",
         cost: "quick",
         who: "both",
-        run: "log",
+        run: "search",
         desc: "Procure um personagem Oculto nos Sensores (teste de Sistemas contra a Agilidade dele).",
       },
       {
@@ -156,13 +163,22 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         desc: "Use um sistema ou equipamento que custa uma Ação Rápida (veja os botões “Usar” na ficha).",
       },
       {
+        id: "prepare",
+        name: "Preparar Ação",
+        en: "Prepare",
+        cost: "quick",
+        who: "both",
+        run: "log",
+        desc: "Escolha outra Ação Rápida e um gatilho (“quando X, então Y”). Até o início do seu próximo turno, ela pode ser feita como reação quando o gatilho acontecer. Depois de preparar, não pode se mover nem fazer outras ações ou reações até o gatilho ou o seu próximo turno.",
+      },
+      {
         id: "shutdown",
         name: "Desligar",
         en: "Shut Down",
         cost: "quick",
         who: "mech",
-        run: "log",
-        desc: "Desliga o mech: zera o calor, encerra efeitos tech e cascata de IA, mas fica Atordoado até Ligar.",
+        run: "shutdown",
+        desc: "Desliga o mech: zera o calor e remove Exposto, encerra efeitos tech (como Mira Travada) e cascata de IA; fica imune a ações tech, mas Atordoado até Ligar.",
       },
       {
         id: "eject",
@@ -170,7 +186,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         en: "Eject",
         cost: "quick",
         who: "mech",
-        run: "log",
+        run: "eject",
         desc: "O piloto ejeta e voa 6 espaços. Uso único: o mech fica Prejudicado até o próximo Reparo Total.",
       },
       {
@@ -180,7 +196,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         cost: "quick",
         who: "mech",
         run: "log",
-        desc: "Último recurso: o reator explode no fim do seu próximo turno (ou no fim de um dos dois seguintes).",
+        desc: "Último recurso: o reator explode no fim do seu próximo turno (ou no fim de um dos seus turnos nas duas rodadas seguintes, à sua escolha). Destrói o mech, mata quem estiver dentro e causa Explosão 2 de 4d6 explosivo; quem passar numa salvaguarda de Agilidade leva metade.",
       },
     ],
   },
@@ -244,12 +260,21 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         desc: "Use um sistema ou equipamento que custa uma Ação Inteira.",
       },
       {
+        id: "skillcheck",
+        name: "Teste de Perícia",
+        en: "Skill Check",
+        cost: "full",
+        who: "both",
+        run: "log",
+        desc: "Uma atividade complexa que não é coberta por outras ações (o Mestre define o atributo e o objetivo): 1d20 + atributo (e gatilho de perícia), sucesso com 10+.",
+      },
+      {
         id: "bootup",
         name: "Ligar",
         en: "Boot Up",
         cost: "full",
         who: "mech",
-        run: "log",
+        run: "bootup",
         desc: "Religa um mech Desligado.",
       },
       {
@@ -297,7 +322,7 @@ export const GUIDE: { group: string; actions: GuideAction[] }[] = [
         cost: "free",
         who: "mech",
         run: "overcharge",
-        desc: "Uma vez por turno: ganhe uma Ação Rápida extra. Custa calor, que aumenta a cada uso na cena: 1, 1d3, 1d6, 1d6+4.",
+        desc: "Uma vez por turno: ganhe uma Ação Rápida extra. Custa calor, que aumenta a cada uso até o próximo Reparo Total: 1, 1d3, 1d6, 1d6+4.",
       },
       {
         id: "protocol",

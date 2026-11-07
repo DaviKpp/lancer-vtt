@@ -125,6 +125,10 @@ export interface AttackInput {
   notes?: string[];
   /** Attack against several targets: the damage was rolled once for all of them (rollSharedDamage). */
   sharedDamage?: SharedDamage;
+  /** NPCs can't crit (LANCER core p.281) unless the feature lists a crit effect. */
+  noCrit?: boolean;
+  /** Overkill tag: damage dice that come up 1 are rerolled and deal 1 heat to the attacker each. */
+  overkill?: boolean;
 }
 
 type RolledDamage = NonNullable<RollResult["damage"]>;
@@ -132,24 +136,40 @@ type RolledDamage = NonNullable<RollResult["damage"]>;
 export interface SharedDamage {
   normal: RolledDamage;
   crit: RolledDamage;
+  /** Overkill heat of each version. */
+  normalHeat?: number;
+  critHeat?: number;
 }
 
 /**
  * LANCER: an attack against several targets (area weapons...) rolls to hit each of them separately,
  * but rolls damage only once. The critical version keeps the higher of two rolls, like a single crit.
  */
-export function rollSharedDamage(damage: DamageEntry[], bonusDamage?: string): SharedDamage {
+export function rollSharedDamage(damage: DamageEntry[], bonusDamage?: string, overkill = false): SharedDamage {
   const exprs = [...damage.map((d) => ({ type: d.type, val: d.val })), ...(bonusDamage ? [{ type: "Bonus", val: bonusDamage }] : [])];
+  // LANCER: bonus damage is halved (rounding up) when an attack targets more than one character
+  const halveBonus = (d: { type: string }, amount: number) => (d.type === "Bonus" ? Math.ceil(amount / 2) : amount);
+  const note = (d: { type: string }) => (d.type === "Bonus" ? " ÷2 (vários alvos)" : "");
+  const normalHeats: number[] = [];
   const normal = exprs.map((d) => {
-    const r = rollExpression(d.val, false);
-    return { type: d.type, amount: r.total, detail: r.detail };
+    const r = rollExpression(d.val, false, overkill);
+    normalHeats.push(r.heat ?? 0);
+    return { type: d.type, amount: halveBonus(d, r.total), detail: r.detail + note(d) };
   });
+  // the crit version (dice rolled twice, highest kept); never lower than the normal roll
+  let critHeat = 0;
   const crit = exprs.map((d, i) => {
-    const again = rollExpression(d.val, false);
-    const best = again.total > normal[i].amount ? again : { total: normal[i].amount, detail: normal[i].detail };
-    return { type: d.type, amount: best.total, detail: `${normal[i].detail} | ${again.detail} → ${best.total}` };
+    const r = rollExpression(d.val, true, overkill);
+    const amount = halveBonus(d, r.total);
+    if (amount >= normal[i].amount) {
+      critHeat += r.heat ?? 0;
+      return { type: d.type, amount, detail: r.detail + note(d) };
+    }
+    critHeat += normalHeats[i];
+    return normal[i];
   });
-  return { normal, crit };
+  const normalHeat = normalHeats.reduce((x, y) => x + y, 0);
+  return { normal, crit, normalHeat: normalHeat || undefined, critHeat: critHeat || undefined };
 }
 
 /**
@@ -167,19 +187,25 @@ export function rollAttack(input: AttackInput): RollResult {
     if (total < defense) outcome = "miss";
     else outcome = input.kind === "attack" && total >= 20 ? "crit" : "hit";
   } else if (input.kind === "attack" && total >= 20) outcome = "crit";
+  if (outcome === "crit" && input.noCrit) outcome = defense !== undefined ? "hit" : undefined;
 
   let damage: RollResult["damage"];
+  let overkillHeat = 0;
   const hit = outcome === undefined || outcome !== "miss";
   if (hit && input.sharedDamage) {
-    damage = (outcome === "crit" ? input.sharedDamage.crit : input.sharedDamage.normal).map((d) => ({ ...d }));
+    const sd = input.sharedDamage;
+    damage = (outcome === "crit" ? sd.crit : sd.normal).map((d) => ({ ...d }));
+    overkillHeat = (outcome === "crit" ? sd.critHeat : sd.normalHeat) ?? 0;
   } else if (hit && input.damage?.length) {
     const crit = outcome === "crit";
     damage = input.damage.map((d) => {
-      const r = rollExpression(d.val, crit);
+      const r = rollExpression(d.val, crit, input.overkill);
+      overkillHeat += r.heat ?? 0;
       return { type: d.type, amount: r.total, detail: r.detail };
     });
     if (input.bonusDamage) {
-      const r = rollExpression(input.bonusDamage, crit);
+      const r = rollExpression(input.bonusDamage, crit, input.overkill);
+      overkillHeat += r.heat ?? 0;
       damage.push({ type: "Bonus", amount: r.total, detail: r.detail });
     }
   }
@@ -216,6 +242,7 @@ export function rollAttack(input: AttackInput): RollResult {
     defense,
     defenseLabel: defense === undefined ? undefined : input.defenseLabel ?? (input.kind === "tech" ? "Def-E" : "Eva"),
     ap: input.ap || undefined,
+    overkillHeat: overkillHeat || undefined,
     outcome,
     damage,
     notes: input.notes,

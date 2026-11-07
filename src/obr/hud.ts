@@ -366,11 +366,13 @@ export function startHud() {
       const dpi = await OBR.scene.grid.getDpi();
       const present = new Set(tokens.map((t) => t.id));
       const desired: Spec[] = [];
-      for (const c of Object.values(combatants)) {
-        if (!c.tokenId || !present.has(c.tokenId)) continue;
-        const b = await OBR.scene.items.getItemBounds([c.tokenId]);
-        desired.push(...specsFor(c, b, dpi, role, turnStateOf(c, encounter, combatants)));
-      }
+      // ask Owlbear for every token's bounds at once instead of one round trip per token
+      const linked = Object.values(combatants).filter((c) => c.tokenId && present.has(c.tokenId));
+      const bounds = await Promise.all(linked.map((c) => OBR.scene.items.getItemBounds([c.tokenId as string]).catch(() => null)));
+      linked.forEach((c, i) => {
+        const b = bounds[i];
+        if (b) desired.push(...specsFor(c, b, dpi, role, turnStateOf(c, encounter, combatants)));
+      });
       const want = new Map(desired.map((s) => [s.id, s]));
       const existing = new Set(
         (await OBR.scene.local.getItems((i) => i.metadata[HUD_KEY] !== undefined)).map((i) => i.id),
@@ -429,9 +431,23 @@ export function startHud() {
     });
 
     ({ combatants, encounter } = readRoomState(await OBR.room.getMetadata()));
+    const linkedKey = () =>
+      Object.values(combatants)
+        .map((c) => c.tokenId)
+        .filter(Boolean)
+        .sort()
+        .join("|");
+    let lastLinked = linkedKey();
     OBR.room.onMetadataChange((m) => {
       ({ combatants, encounter } = readRoomState(m));
-      // refresh which tokens matter, then draw
+      // Most room changes are numbers (HP, heat, actions...): just redraw. Re-read the scene only
+      // when the set of linked tokens changed (it can be big, and room changes are frequent).
+      const now = linkedKey();
+      if (now === lastLinked) {
+        schedule();
+        return;
+      }
+      lastLinked = now;
       void OBR.scene.isReady().then(async (ready) => {
         if (ready) onItems(await OBR.scene.items.getItems());
         schedule();

@@ -27,7 +27,12 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
 
   // Damage options chosen by the GM before applying: armor-piercing (preset from the weapon's AP tag),
   // resistance per damage type, and a flat reduction.
-  const typeOf = (t: string) => (t === "Bonus" ? r.damage?.[0]?.type ?? "Kinetic" : t);
+  // bonus damage takes the weapon's type, but is never burn or heat (then it's kinetic)
+  const typeOf = (t: string) => {
+    if (t !== "Bonus") return t;
+    const first = r.damage?.[0]?.type ?? "Kinetic";
+    return /burn|heat/i.test(first) ? "Kinetic" : first;
+  };
   const types = Array.from(new Set((r.damage ?? []).map((d) => typeOf(d.type))));
   const [ap, setAp] = useState(!!r.ap);
   const [resist, setResist] = useState<Record<string, boolean>>({});
@@ -49,7 +54,8 @@ export function RollCard({ r, onApplied }: { r: RollResult; onApplied?: () => vo
     }
     await patchWithChecks(
       target,
-      { hp: state.hp, os: state.os, structure: state.structure, heat: state.heat, stress: state.stress },
+      // st too: heat damage can leave an NPC Exposed
+      { hp: state.hp, os: state.os, structure: state.structure, heat: state.heat, stress: state.stress, st: state.st },
       { id: app.session.playerId, name: app.session.playerName },
     );
     rollLog.markApplied(r.id);

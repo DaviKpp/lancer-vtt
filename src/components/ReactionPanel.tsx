@@ -1,6 +1,6 @@
 import type { CombatantState, Sheet } from "../lib/types";
 import { reactionBlocked, reactionsFor, reactionsThisTurn, type ReactionDef } from "../lib/reactions";
-import { useReaction } from "../obr/actions";
+import { useReaction, confirmReaction } from "../obr/actions";
 import { useApp } from "./AppContext";
 import { Html } from "./Html";
 
@@ -24,6 +24,7 @@ export function ReactionPanel({
   const by = { id: app.session.playerId, name: app.session.playerName };
 
   const use = async (def: ReactionDef) => {
+    if (!(await confirmReaction(c, def))) return;
     await useReaction(c, def, by);
     if (def.kind === "overwatch") onOverwatch?.();
   };

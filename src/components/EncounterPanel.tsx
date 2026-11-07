@@ -23,7 +23,9 @@ import { ActionGuide } from "./ActionGuide";
 import { AbilitySummary } from "./AbilitySummary";
 import { BarragePanel } from "./BarragePanel";
 import { TurnTracker } from "./TurnTracker";
-import { endTurn, startTurn } from "../obr/turns";
+import { startTurn } from "../obr/turns";
+import { endTurnWithBurn } from "../obr/burn";
+import { confirmStartTurn } from "../obr/actions";
 import { ReactionPanel } from "./ReactionPanel";
 import { notify } from "../obr/toast";
 
@@ -90,7 +92,13 @@ export function EncounterPanel() {
     )
       return;
     await patchCombatants(
-      Object.fromEntries(members.map((c) => [c.id, { used: 0, ac: {}, ocn: 0, rx: undefined, ru: undefined, br: undefined }])),
+      Object.fromEntries(
+        members.map((c) => {
+          // the scene is over: effects "until the end of the scene" (and turn-based ones) end with it
+          const nts = (c.nts ?? []).filter((n) => n.until === "manual");
+          return [c.id, { used: 0, ac: {}, rx: undefined, ru: undefined, br: undefined, nts: nts.length ? nts : undefined }];
+        }),
+      ),
     );
     await deleteInstances(npcIds, true);
   };
@@ -270,12 +278,22 @@ function EncounterRow({ c, active, onRemove }: { c: CombatantState; active: bool
             </div>
           )}
           {active && editable && !done && !acting && (
-            <button className="btn-small ghost" onClick={() => startTurn(c.id)} title="Começa o turno: libera ações e repõe as reações">
+            <button
+              className="btn-small ghost"
+              onClick={async () => {
+                if (await confirmStartTurn(c)) await startTurn(c.id);
+              }}
+              title="Começa o turno: libera ações e repõe as reações"
+            >
               Iniciar turno
             </button>
           )}
           {active && editable && !done && acting && (
-            <button className="btn-small" onClick={() => endTurn(c.id)}>
+            <button
+              className="btn-small"
+              onClick={() => void endTurnWithBurn(c, sheet, { id: app.session.playerId, name: app.session.playerName })}
+              title={c.burn > 0 ? `Encerra o turno; depois, teste de Engenharia contra a Queimadura ${c.burn}` : "Encerra o turno"}
+            >
               Fim do turno
             </button>
           )}

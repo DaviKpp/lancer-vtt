@@ -21,6 +21,30 @@ export interface AttackShape {
   melee?: boolean;
   seeking?: boolean; // ignores cover
   smart?: boolean; // targets E-Defense
+  range?: { type: string }[]; // Blast / Burst / Line / Cone make an area attack
+  basic?: boolean; // Improvised Attack, Grapple or Ram (the only attacks a Jammed character can make)
+}
+
+/** Weapons whose range is an area (Blast, Burst, Line, Cone) affect every character in it. */
+export const isAreaAttack = (a: AttackShape) => (a.range ?? []).some((r) => /blast|burst|line|cone/i.test(r.type));
+
+/**
+ * Rules that stop an attack outright (LANCER core): a Jammed attacker can only Improvised Attack,
+ * Grapple or Ram; a Hidden target can't be targeted directly (only by area attacks); a pilot on foot
+ * is immune to tech actions.
+ */
+export function attackBlockers(a: AttackShape, attacker: CombatantState | undefined, target: CombatantState | undefined) {
+  return {
+    jammed: has(attacker, "jammed") && !a.basic ? "Você está Bloqueado: só Ataque Improvisado, Agarrar ou Investida" : undefined,
+    hidden: has(target, "hidden") && !isAreaAttack(a) ? "Alvo Oculto: só pode ser atingido por ataques em área" : undefined,
+    biological:
+      (target?.kind === "pilot" || target?.bio) && a.kind === "tech"
+        ? `${target?.kind === "pilot" ? "Piloto a pé" : "Alvo"} biológico: imune a ações tech`
+        : undefined,
+    shutDown:
+      has(target, "shut-down") && a.kind === "tech" ? "Alvo Desligado: imune a ações e ataques tech" : undefined,
+    bioAttacker: attacker?.bio && a.kind === "tech" ? "NPC biológico: não faz ações tech, salvo se a habilidade disser" : undefined,
+  };
 }
 
 const has = (c: CombatantState | undefined, id: string) => !!c?.st?.includes(id);
@@ -62,7 +86,8 @@ export function defenseFor(
   if (!target) return {};
   if (a.kind === "tech" || a.smart)
     return { value: target.edef, label: "Def-E", note: a.smart && a.kind === "attack" ? "Inteligente: contra Defesa-E" : undefined };
-  if (has(target, "stunned")) return { value: Math.min(target.evasion, 5), label: "Eva", note: "Alvo Atordoado: Evasão máx. 5" };
+  if (has(target, "stunned") || has(target, "shut-down"))
+    return { value: Math.min(target.evasion, 5), label: "Eva", note: "Alvo Atordoado: Evasão máx. 5" };
   return { value: target.evasion, label: "Eva" };
 }
 

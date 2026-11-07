@@ -111,28 +111,34 @@ async function animate(m: FxMsg) {
     // Background pages don't get animation frames, so step with timers; each step waits for
     // Owlbear to apply the previous one, which keeps the pace smooth without flooding it.
     const start = performance.now();
+    let shown = new Set<string>(); // pieces visible in the previous frame
     for (;;) {
       const t = Math.min(plan.duration, (performance.now() - start) / 1000);
       const byId = new Map<string, Prim>(plan.at(t).map((p) => [itemId(p.id), p]));
-      await OBR.scene.local.updateItems(ids, (drafts) => {
-        /* eslint-disable @typescript-eslint/no-explicit-any */
-        for (const d of drafts as any[]) {
-          const p = byId.get(d.id);
-          if (!p) {
-            d.style.fillOpacity = 0;
-            d.style.strokeOpacity = 0;
-            continue;
+      // only send what is on screen now, plus what just disappeared (to hide it); the rest is unchanged
+      const touch = [...new Set([...byId.keys(), ...shown])];
+      shown = new Set(byId.keys());
+      if (touch.length) {
+        await OBR.scene.local.updateItems(touch, (drafts) => {
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          for (const d of drafts as any[]) {
+            const p = byId.get(d.id);
+            if (!p) {
+              d.style.fillOpacity = 0;
+              d.style.strokeOpacity = 0;
+              continue;
+            }
+            d.commands = toPath(p.cmds);
+            if (p.fill) d.style.fillColor = p.fill;
+            d.style.fillOpacity = p.fill ? Math.max(0, p.fillOpacity ?? 1) : 0;
+            if (p.stroke) {
+              d.style.strokeColor = p.stroke;
+              d.style.strokeWidth = p.strokeWidth ?? 2;
+            }
+            d.style.strokeOpacity = p.stroke ? Math.max(0, p.strokeOpacity ?? 1) : 0;
           }
-          d.commands = toPath(p.cmds);
-          if (p.fill) d.style.fillColor = p.fill;
-          d.style.fillOpacity = p.fill ? Math.max(0, p.fillOpacity ?? 1) : 0;
-          if (p.stroke) {
-            d.style.strokeColor = p.stroke;
-            d.style.strokeWidth = p.strokeWidth ?? 2;
-          }
-          d.style.strokeOpacity = p.stroke ? Math.max(0, p.strokeOpacity ?? 1) : 0;
-        }
-      });
+        });
+      }
       if (t >= plan.duration) break;
       await sleep(16);
     }

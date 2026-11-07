@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { HitNotes } from "./HitNotes";
+import { UsageBadge } from "./UsageBadge";
 import type { CombatantState, MechSheet } from "../lib/types";
 import { tr } from "../lib/i18n";
 import { AttackPanel, type AttackSpec } from "./AttackPanel";
@@ -16,6 +18,8 @@ import { Portrait } from "./Portrait";
 import { TalentAbilities } from "./TalentAbilities";
 import { rangeText, Section, signed, Stat, Tags } from "./common";
 import { useApp } from "./AppContext";
+import { JockeyPanel } from "./JockeyPanel";
+import { confirmAction, takeAction } from "../obr/actions";
 
 /** Sheet of a pilot outside their mech (created by "Desmontar"). */
 export function PilotSheetView({ c, sheet, editable }: { c: CombatantState; sheet: MechSheet; editable: boolean }) {
@@ -87,6 +91,37 @@ export function PilotSheetView({ c, sheet, editable }: { c: CombatantState; shee
         </div>
       </Section>
 
+      <HitNotes c={c} editable={editable} />
+
+      {editable && (
+        <Section title="Ações do piloto">
+          <p className="muted small">
+            As ações do piloto a pé saem do mesmo conjunto do mech: um movimento e duas Ações Rápidas, ou uma Ação Inteira.
+          </p>
+          {weapons.some((w) => w.tags.some((t) => t.id === "tg_loading")) && (
+            <button
+              className="btn-small"
+              title="Ação Rápida: recarrega uma arma de piloto Recarregável"
+              onClick={async () => {
+                const empty = weapons.filter((w) => c.ul?.includes(w.uid));
+                const extra = empty.length ? [] : ["Nenhuma arma de piloto está descarregada"];
+                if (!(await confirmAction(c, "quick", "Recarregar", extra))) return;
+                const w = empty[0];
+                await takeAction(c, "quick", "Recarregar", by, { detail: w ? w.name : undefined });
+                if (w) {
+                  const ul = (c.ul ?? []).filter((x) => x !== w.uid);
+                  await patchCombatant(c.id, { ul: ul.length ? ul : undefined });
+                }
+              }}
+            >
+              Recarregar (Ação Rápida)
+            </button>
+          )}
+          <strong>Montar no Inimigo (Jockey)</strong>
+          <JockeyPanel c={c} sheet={sheet} />
+        </Section>
+      )}
+
       <Section title={`Armas do piloto (${weapons.length})`}>
         {weapons.length === 0 && (
           <p className="muted small">
@@ -119,6 +154,7 @@ export function PilotSheetView({ c, sheet, editable }: { c: CombatantState; shee
             </div>
             {editable && <WeaponFxSelect spec={pilotWeaponSpec(w, sheet)} />}
             <Tags tags={w.tags} />
+            <UsageBadge c={c} tags={w.tags} uid={w.uid} editable={editable} />
             {w.effect && <Html html={w.effect} />}
             {w.onHit && <Html html={`<b>No acerto:</b> ${w.onHit}`} />}
             {attack?.key === w.uid && <AttackPanel attacker={c} spec={attack.spec} onClose={() => setAttack(null)} />}
@@ -137,7 +173,8 @@ export function PilotSheetView({ c, sheet, editable }: { c: CombatantState; shee
       </Section>
 
       <Section title={`Talentos (${p.talents.length})`} defaultOpen={false}>
-        <TalentAbilities talents={p.talents} c={c} editable={editable} />
+        <p className="muted small">Fora do mech, o piloto não se beneficia de talentos (regra do livro básico).</p>
+        <TalentAbilities talents={p.talents} c={c} editable={false} />
       </Section>
 
       {p.gear.length > 0 && (

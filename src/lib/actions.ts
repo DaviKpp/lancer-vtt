@@ -60,12 +60,56 @@ export function blockedReason(c: CombatantState | undefined, cost: ActionCost, t
 }
 
 /** Returns the action state after spending `cost` (never fails: the table decides). */
-export function spend(ac: TurnActions | undefined, cost: ActionCost): TurnActions {
+export function spend(ac: TurnActions | undefined, cost: ActionCost, name?: string): TurnActions {
   const t: TurnActions = { ...(ac ?? {}) };
   if (cost === "quick") t.q = Math.min((t.q ?? 0) + 1, 3);
   if (cost === "full") t.f = true;
   if (cost === "move") t.m = true;
+  // remember the action, so taking it again this turn can be flagged (free actions may repeat)
+  if (name && REPEAT_CHECK.has(cost)) t.n = Array.from(new Set([...(t.n ?? []), name]));
   return t;
+}
+
+/** Tech actions (a Jammed character can't take them). */
+const TECH_ACTIONS = new Set(["Invadir", "Travar Mira", "Escanear", "Reforçar", "Tech Inteira"]);
+
+/** Costs where "the same action only once per turn" applies (free actions and reactions may repeat). */
+const REPEAT_CHECK = new Set<ActionCost>(["quick", "full", "protocol"]);
+
+/**
+ * Everything irregular about taking an action now (LANCER rules): no action of that kind left,
+ * the same action already taken this turn, a Stunned / Shut Down mech... Empty when it's fine.
+ * Nothing here blocks: the player is warned and decides (talents and systems bend these rules).
+ */
+export function actionIssues(
+  c: CombatantState | undefined,
+  cost: ActionCost,
+  name: string,
+  tk = 0,
+  opts: { mounting?: boolean } = {},
+): string[] {
+  if (!c || cost === "none") return [];
+  const out: string[] = [];
+  const st = c.st ?? [];
+  // Stunned / Shut Down: no actions at all, except Boot Up (to end Shut Down) and the pilot
+  // mounting, dismounting or ejecting
+  const pilotExit = /Montar|Desmontar|Ejetar/i.test(name);
+  if (c.kind !== "pilot" && st.includes("shut-down") && name !== "Ligar" && !pilotExit)
+    out.push("O mech está Desligado: não pode agir até Ligar");
+  else if (c.kind !== "pilot" && st.includes("stunned") && !st.includes("shut-down") && !pilotExit)
+    out.push("Atordoado: não pode se mover nem fazer ações (nem livres ou reações)");
+  if (name === "Ligar" && !st.includes("shut-down")) out.push("O mech não está Desligado");
+  const moving = cost === "move" || name === "Impulsionar";
+  if (moving && st.includes("immobilized")) out.push("Imobilizado: não pode se mover voluntariamente");
+  else if (name === "Impulsionar" && (st.includes("slow") || st.includes("slowed") || st.includes("prone")))
+    out.push("Lento (ou Caído): só pode fazer o movimento padrão, não pode Impulsionar");
+  if (TECH_ACTIONS.has(name) && st.includes("jammed")) out.push("Bloqueado: não pode fazer ações tech");
+  if (c.kind === "mech" && c.dm && !opts.mounting) out.push("O mech está sem piloto (o piloto desmontou)");
+  const blocked = blockedReason(c, cost, tk);
+  if (blocked) out.push(blocked);
+  if (REPEAT_CHECK.has(cost) && (c.ac?.n ?? []).includes(name))
+    out.push(`“${name}” já foi usada neste turno — a mesma ação só se repete como ação livre ou com um talento/sistema que permita`);
+  return out;
 }
 
 /** Overcharge heat cost by number of previous uses this scene: 1, 1d3, 1d6, 1d6+4. */

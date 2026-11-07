@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CombatantState } from "../lib/types";
-import { applyDamage, applyHeat, fullRepair } from "../lib/rules";
+import { applyDamage, applyHeat, fullRepair, rest } from "../lib/rules";
 import { clamp } from "../lib/util";
 import { patchWithChecks } from "../obr/checks";
 import { announce, publicLog } from "../obr/announce";
@@ -132,8 +132,17 @@ export function Trackers({
             </button>
             <button
               className="btn-small ghost"
+              title="Descanso (1 hora): zera o calor, limpa status e condições; piloto recupera metade do PV e sai de Abatido. Gaste Reparos à mão."
               onClick={() => {
-                if (confirm(`Reparo total em ${c.name}? (PV, calor, estrutura, estresse, queimadura, reparos)`)) onPatch(fullRepair(c));
+                if (confirm(`Descanso de ${c.name}? (calor zerado, status e condições limpos${c.kind === "pilot" ? ", +metade do PV" : ""})`)) onPatch(rest(c));
+              }}
+            >
+              Descanso
+            </button>
+            <button
+              className="btn-small ghost"
+              onClick={() => {
+                if (confirm(`Reparo total em ${c.name}? (PV, calor, estrutura, estresse, reparos, usos Limitados, status e condições)`)) onPatch(fullRepair(c));
               }}
             >
               Reparo total

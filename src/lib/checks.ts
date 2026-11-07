@@ -71,7 +71,7 @@ function stress(dice: number[], lowest: number, ones: number, remaining: number)
       ...base,
       title: "Colapso Irreversível",
       text: "Dois ou mais 1: o reator entra em colapso e explode no fim do seu próximo turno.",
-      statuses: ["exposed"],
+      statuses: [],
     };
   }
   if (lowest >= 5) {
@@ -92,15 +92,15 @@ function stress(dice: number[], lowest: number, ones: number, remaining: number)
     return {
       ...base,
       title: "Colapso",
-      text: "O mech fica Exposto e faz um teste de Engenharia. Falha: o reator entra em colapso no fim de 1d6 dos seus turnos (o mestre rola em segredo); dá para reverter com uma ação inteira repetindo o teste.",
-      statuses: ["exposed"],
+      text: "Faça um teste de Engenharia. Sucesso: o mech fica Exposto. Falha: o reator entra em colapso depois de 1d6 dos seus turnos (o mestre rola); dá para evitar repetindo o teste de Engenharia como ação livre.",
+      statuses: [],
     };
   }
   return {
     ...base,
     title: "Colapso",
-    text: "O reator entra em colapso no fim de 1d6 dos seus turnos (o mestre rola em segredo).",
-    statuses: ["exposed"],
+    text: "Com 1 de estresse restante, o reator entra em colapso no fim do seu próximo turno.",
+    statuses: [],
   };
 }
 

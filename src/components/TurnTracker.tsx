@@ -1,7 +1,9 @@
 import type { CombatantState, TurnActions } from "../lib/types";
 import { quickCap, turnSummary } from "../lib/actions";
 import { reactionBlocked } from "../lib/reactions";
-import { endTurn, startTurn } from "../obr/turns";
+import { startTurn } from "../obr/turns";
+import { endTurnWithBurn } from "../obr/burn";
+import { confirmStartTurn } from "../obr/actions";
 import { notify } from "../obr/toast";
 import { turnStateOf } from "./TurnDot";
 import { useApp } from "./AppContext";
@@ -20,6 +22,7 @@ export function TurnTracker({ c, editable, compact }: { c: CombatantState; edita
   const turn = turnStateOf(c, app.room.encounter, app.room.combatants);
   const acting = turn === "acting";
   const start = async () => {
+    if (!(await confirmStartTurn(c))) return;
     await startTurn(c.id);
     // outside an encounter there's no "whose turn" to show: say what happened
     if (!turn) void notify(`${c.name}: ações do turno liberadas.`, "SUCCESS");
@@ -70,7 +73,15 @@ export function TurnTracker({ c, editable, compact }: { c: CombatantState; edita
           {acting && <span className="badge badge-turn">● Turno ativo</span>}
           {editable &&
             (acting ? (
-              <button className="btn-small" onClick={() => void endTurn(c.id)} title="Encerra o turno e gasta a ativação desta rodada">
+              <button
+                className="btn-small"
+                onClick={() => void endTurnWithBurn(c, app.sheetFor(c.id), { id: app.session.playerId, name: app.session.playerName })}
+                title={
+                  c.burn > 0
+                    ? `Encerra o turno; depois, teste de Engenharia contra a Queimadura ${c.burn}`
+                    : "Encerra o turno e gasta a ativação desta rodada"
+                }
+              >
                 Encerrar turno
               </button>
             ) : (

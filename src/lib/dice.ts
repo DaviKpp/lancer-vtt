@@ -20,19 +20,32 @@ export function rollAccuracy(net: number): { dice: number[]; mod: number } {
 export interface DiceRoll {
   total: number;
   detail: string;
+  /** Overkill: heat the attacker takes (1 per damage die that came up 1 and was rerolled). */
+  heat?: number;
 }
 
 /**
  * Rolls expressions like "1d6+2", "2d6", "3", "1d3+1d6".
  * Non-dice text (e.g. "X") rolls to 0 and is reported in the detail.
- * On a critical hit LANCER rolls the damage dice twice and keeps the highest result.
+ * On a critical hit LANCER rolls the damage dice twice and keeps the highest dice.
+ * Overkill (tag): every damage die that comes up 1 deals 1 heat to the attacker and is rerolled,
+ * as many times as it keeps coming up 1.
  */
-export function rollExpression(expr: string, crit = false): DiceRoll {
+export function rollExpression(expr: string, crit = false, overkill = false): DiceRoll {
   const clean = String(expr).replace(/\s+/g, "");
   if (!clean) return { total: 0, detail: "0" };
   const terms = clean.match(/[+-]?[^+-]+/g) ?? [];
   let total = 0;
+  let heat = 0;
   const parts: string[] = [];
+  const die = (sides: number) => {
+    let v = rollDie(sides);
+    while (overkill && v === 1 && sides > 1) {
+      heat++;
+      v = rollDie(sides);
+    }
+    return v;
+  };
   for (const term of terms) {
     const sign = term.startsWith("-") ? -1 : 1;
     const body = term.replace(/^[+-]/, "");
@@ -40,15 +53,15 @@ export function rollExpression(expr: string, crit = false): DiceRoll {
     if (m) {
       const count = Number(m[1] || 1);
       const sides = Number(m[2]);
-      const roll = () => Array.from({ length: count }, () => rollDie(sides));
+      const roll = () => Array.from({ length: count }, () => die(sides));
       let dice = roll();
       let label = `${count}d${sides}[${dice.join(",")}]`;
       if (crit) {
-        const second = roll();
-        const sumA = dice.reduce((a, b) => a + b, 0);
-        const sumB = second.reduce((a, b) => a + b, 0);
-        label = `${count}d${sides}[${dice.join(",")}|${second.join(",")}]`;
-        if (sumB > sumA) dice = second;
+        // Critical hit (LANCER core): roll the damage dice twice and keep the highest dice —
+        // 2d6 becomes 4d6, keep the two highest. Shown as [kept|dropped].
+        const all = [...dice, ...roll()].sort((a, b) => b - a);
+        dice = all.slice(0, count);
+        label = `${count}d${sides}[${dice.join(",")}|${all.slice(count).join(",")}]`;
       }
       const sum = dice.reduce((a, b) => a + b, 0);
       total += sign * sum;
@@ -60,5 +73,6 @@ export function rollExpression(expr: string, crit = false): DiceRoll {
       parts.push(`(${body}?)`);
     }
   }
-  return { total: Math.max(0, total), detail: parts.join(" + ").replace(/\+ -/g, "- ") };
+  const detail = parts.join(" + ").replace(/\+ -/g, "- ") + (heat ? ` · Exagero: ${heat}× 1 rolado de novo` : "");
+  return { total: Math.max(0, total), detail, heat: heat || undefined };
 }

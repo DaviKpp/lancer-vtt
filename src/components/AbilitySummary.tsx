@@ -4,6 +4,7 @@ import { ActionLine, CostBadges } from "./ActionLine";
 import { Html } from "./Html";
 import { rangeText, signed, Tags } from "./common";
 import { TalentAbilities } from "./TalentAbilities";
+import { rechargeTarget } from "../obr/recharge";
 
 const ORDER: Record<string, number> = { weapon: 0, tech: 1, system: 2, reaction: 3, trait: 4 };
 
@@ -18,6 +19,11 @@ export function AbilitySummary({ sheet, c, editable }: { sheet: Sheet; c: Combat
             <summary>
               <span className="badge">{tr(f.type)}</span> <strong>{f.name}</strong> <CostBadges actions={f.actions} />
               {f.destroyed && <span className="badge badge-off">Destruído</span>}
+              {rechargeTarget(f.tags) && (
+                <span className={`badge ${c.rc?.[f.uid] !== undefined ? "badge-off" : ""}`}>
+                  {c.rc?.[f.uid] !== undefined ? `⏳ Recarregando (${rechargeTarget(f.tags)}+)` : `Recarga ${rechargeTarget(f.tags)}+`}
+                </span>
+              )}
               <span className="muted small">
                 {f.weaponType ? ` · ${tr(f.weaponType)}` : ""}
                 {f.range.length ? ` · ${rangeText(f.range)}` : ""}
@@ -30,7 +36,14 @@ export function AbilitySummary({ sheet, c, editable }: { sheet: Sheet; c: Combat
             {f.trigger && <Html html={`<b>Gatilho:</b> ${f.trigger}`} />}
             <Html html={f.effect} />
             {f.actions.map((a, i) => (
-              <ActionLine key={i} a={a} c={c} editable={editable} disabled={f.destroyed} />
+              <ActionLine
+                key={i}
+                a={a}
+                c={c}
+                editable={editable}
+                disabled={f.destroyed}
+                recharge={rechargeTarget(f.tags) ? { uid: f.uid, target: rechargeTarget(f.tags)! } : undefined}
+              />
             ))}
             {f.onHit && <Html html={`<b>No acerto:</b> ${f.onHit}`} />}
             {f.onCrit && <Html html={`<b>No crítico:</b> ${f.onCrit}`} />}

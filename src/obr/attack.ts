@@ -1,7 +1,7 @@
 import type { AttackSpec } from "../components/AttackPanel";
 import type { RollResult } from "../lib/types";
 import { rollDie } from "../lib/dice";
-import { autoModifiers, defenseFor, type Cover } from "../lib/modifiers";
+import { attackBlockers, autoModifiers, defenseFor, type Cover } from "../lib/modifiers";
 import { applyOnHit } from "./effects";
 import { getRoomState, patchCombatant } from "./room";
 import { publishRoll, rollAttack, rollSharedDamage, type SharedDamage } from "./rolls";
@@ -9,6 +9,10 @@ import { throwDiceAndWait } from "./dice";
 import { playShot } from "./fx";
 import { weaponFx } from "../lib/fxFrames";
 import { weaponFxChoice } from "../lib/fxPrefs";
+import { applyHeat } from "../lib/rules";
+import { usagePatch } from "../lib/usage";
+import { patchWithChecks } from "./checks";
+import { takeAction } from "./actions";
 
 /** Pause between revealing the hit and throwing the damage dice. */
 const HIT_PAUSE = 900;
@@ -25,6 +29,8 @@ export interface AttackOptions {
   sharedDamage?: SharedDamage;
   /** Throw the damage dice (false when they were already shown for another target of the same attack). */
   showDamageDice?: boolean;
+  /** The player was warned (Jammed, Hidden target, tech vs a pilot on foot) and chose to go ahead. */
+  ignoreBlockers?: boolean;
 }
 
 /** One target of an attack, with its own modifiers. */
@@ -43,14 +49,14 @@ export async function performAttackOnTargets(
   attackerId: string,
   spec: AttackSpec,
   targets: AttackTargetInput[],
-  o: { bonusDamage?: string; label?: string; by: { id: string; name: string } },
+  o: { bonusDamage?: string; label?: string; by: { id: string; name: string }; ignoreBlockers?: boolean },
 ): Promise<RollResult[]> {
   const list = targets.length ? targets : [{ manual: 0, cover: "none" as Cover, consumeLockOn: true }];
   if (list.length === 1) {
-    const r = await performAttack(attackerId, spec, { ...list[0], bonusDamage: o.bonusDamage, label: o.label, by: o.by });
+    const r = await performAttack(attackerId, spec, { ...list[0], bonusDamage: o.bonusDamage, label: o.label, by: o.by, ignoreBlockers: o.ignoreBlockers });
     return r ? [r] : [];
   }
-  const shared = spec.damage?.length ? rollSharedDamage(spec.damage, o.bonusDamage) : undefined;
+  const shared = spec.damage?.length ? rollSharedDamage(spec.damage, o.bonusDamage, spec.overkill) : undefined;
   const out: RollResult[] = [];
   let damageShown = false;
   for (const [i, t] of list.entries()) {
@@ -60,10 +66,12 @@ export async function performAttackOnTargets(
       by: o.by,
       sharedDamage: shared,
       showDamageDice: !damageShown,
+      ignoreBlockers: o.ignoreBlockers,
     });
     if (!r) continue;
+    // the damage (and its Overkill heat) is rolled once for every target
+    out.push(damageShown ? { ...r, overkillHeat: undefined } : r);
     if (r.outcome !== "miss" && r.damage?.length) damageShown = true;
-    out.push(r);
   }
   return out;
 }
@@ -105,6 +113,8 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
     notes,
     by: o.by,
     sharedDamage: o.sharedDamage,
+    noCrit: attacker.kind === "npc" && !spec.critEffect,
+    overkill: spec.overkill,
   });
 
   // Invisible: every attack has a 50% chance to miss outright
@@ -112,6 +122,13 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
     if (rollDie(2) === 1) {
       r = { ...r, outcome: "miss", damage: undefined, effect: undefined, notes: [...(r.notes ?? []), "Alvo Invisível: errou (50%)"] };
     } else r = { ...r, notes: [...(r.notes ?? []), "Alvo Invisível: passou nos 50%"] };
+  }
+
+  // Attacks the rules don't allow miss outright: Jammed attacker (only basic attacks), Hidden target
+  // (only area attacks), pilot on foot vs tech (BIOLOGICAL: immune except Lock On / Scan, which don't roll).
+  const blocked = o.ignoreBlockers ? [] : Object.values(attackBlockers(spec, attacker, target)).filter((x): x is string => !!x);
+  if (blocked.length) {
+    r = { ...r, outcome: "miss", damage: undefined, effect: undefined, notes: [...(r.notes ?? []), ...blocked] };
   }
 
   // Dice first: the to-hit dice, then — once the hit is revealed — the damage dice. Effects on the
@@ -148,4 +165,33 @@ export async function performAttack(attackerId: string, spec: AttackSpec, o: Att
 
   await publishRoll(r, { thrown });
   return r;
+}
+
+/**
+ * After a weapon is used: Limited uses and Loading are marked, and the attacker takes the heat
+ * of Heat X (Self) (once per use, `selfHeat`) and of Overkill (1 per rerolled damage die).
+ */
+export async function afterWeaponUse(
+  attackerId: string,
+  spec: AttackSpec,
+  results: RollResult[],
+  by: { id: string; name: string },
+  opts: { selfHeat?: boolean } = {},
+) {
+  const c = (await getRoomState()).combatants[attackerId];
+  if (!c) return;
+  const self = opts.selfHeat !== false ? spec.heatSelf ?? 0 : 0;
+  const overkill = results.reduce((a, r) => a + (r.overkillHeat ?? 0), 0);
+  const usage = usagePatch(c, spec);
+  if (!self && !overkill) {
+    if (Object.keys(usage).length) await patchCombatant(attackerId, usage);
+    return;
+  }
+  const heat = applyHeat(c, self + overkill);
+  const why = [self ? `Calor ${self} (Próprio)` : "", overkill ? `Exagero ${overkill}` : ""].filter(Boolean).join(" + ");
+  await takeAction(c, "none", `${spec.label}: calor no atacante`, by, {
+    detail: `+${self + overkill} de calor (${why})${heat.log.length > 1 ? " · " + heat.log.slice(1).join(" · ") : ""}`,
+  });
+  const now = (await getRoomState()).combatants[attackerId] ?? c;
+  await patchWithChecks(now, { ...applyHeat(now, self + overkill).patch, ...usagePatch(now, spec) }, by);
 }

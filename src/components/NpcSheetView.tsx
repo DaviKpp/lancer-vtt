@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { HitNotes } from "./HitNotes";
+import { UsageBadge } from "./UsageBadge";
 import type { CombatantState, NpcSheet } from "../lib/types";
 import { patchCombatant } from "../obr/room";
 import { AttackPanel, type AttackSpec } from "./AttackPanel";
@@ -11,6 +13,7 @@ import { DestroyToggle } from "./DestroyToggle";
 import { SkillChecks } from "./SkillChecks";
 import { Portrait } from "./Portrait";
 import { WeaponFxSelect } from "./FxControls";
+import { rechargeTarget, toggleRecharge } from "../obr/recharge";
 import { ActionGuide } from "./ActionGuide";
 import { TurnTracker } from "./TurnTracker";
 import { tr } from "../lib/i18n";
@@ -81,12 +84,15 @@ export function NpcSheetView({ sheet, c, editable }: { sheet: NpcSheet; c?: Comb
         </div>
       </Section>
 
+      <HitNotes c={c} editable={editable} />
+
       <Section title="Habilidades">
         {features.map((f) => (
           <div key={f.uid} className={`card feature-${f.type} ${f.destroyed ? "destroyed" : ""}`}>
             <div className="card-head">
               <div>
                 <strong>{f.name}</strong> <CostBadges actions={f.actions} />
+                <RechargeBadge c={c} uid={f.uid} target={rechargeTarget(f.tags)} editable={editable} />
                 {f.destroyed && <span className="badge badge-off">Destruído</span>}
                 <div className="muted small">
                   <span className="badge">{tr(f.type)}</span>
@@ -119,10 +125,18 @@ export function NpcSheetView({ sheet, c, editable }: { sheet: NpcSheet; c?: Comb
               </div>
             )}
             <Tags tags={f.tags} />
+            <UsageBadge c={c} tags={f.tags} uid={f.uid} editable={editable} />
             {f.trigger && <Html html={`<b>Gatilho:</b> ${f.trigger}`} />}
             <Html html={f.effect} />
             {f.actions.map((a, i) => (
-              <ActionLine key={i} a={a} c={c} editable={editable} disabled={f.destroyed} />
+              <ActionLine
+                key={i}
+                a={a}
+                c={c}
+                editable={editable}
+                disabled={f.destroyed}
+                recharge={rechargeTarget(f.tags) ? { uid: f.uid, target: rechargeTarget(f.tags)! } : undefined}
+              />
             ))}
             {f.onHit && <Html html={`<b>No acerto:</b> ${f.onHit}`} />}
             {f.onCrit && <Html html={`<b>No crítico:</b> ${f.onCrit}`} />}
@@ -146,5 +160,26 @@ export function NpcSheetView({ sheet, c, editable }: { sheet: NpcSheet; c?: Comb
         </Section>
       )}
     </div>
+  );
+}
+
+/** "Recarga 5+" on a feature; "⏳ Recarregando" after it's used. The GM can click to fix it by hand. */
+function RechargeBadge({ c, uid, target, editable }: { c?: CombatantState; uid: string; target?: number; editable: boolean }) {
+  if (!target) return null;
+  const waiting = c?.rc?.[uid] !== undefined;
+  const label = waiting ? `⏳ Recarregando (${target}+)` : `Recarga ${target}+`;
+  if (!c || !editable) return <span className={`badge ${waiting ? "badge-off" : ""}`}>{label}</span>;
+  return (
+    <button
+      className={`badge badge-btn ${waiting ? "badge-off" : ""}`}
+      title={
+        waiting
+          ? "Usada: volta quando o 1d6 do início do turno do NPC tirar " + target + "+ (clique para marcar como recarregada)"
+          : "Disponível (clique para marcar como usada)"
+      }
+      onClick={() => void toggleRecharge(c.id, { uid, target })}
+    >
+      {label}
+    </button>
   );
 }

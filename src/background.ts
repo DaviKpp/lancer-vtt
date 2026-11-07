@@ -11,6 +11,7 @@ import { pushToast } from "./obr/toast";
 import { announce } from "./obr/announce";
 import { getRoomState } from "./obr/room";
 import { startTurn } from "./obr/turns";
+import { startScanResponder } from "./obr/scan";
 
 /** Opens the extension on a combatant's sheet (the popover may not be mounted yet). */
 async function openSheet(id: string) {
@@ -32,6 +33,8 @@ OBR.onReady(() => {
   listenAnnouncements();
   // 3D dice thrown by players.
   listenDice();
+  // Scans from players are answered with the GM's copy of the sheets.
+  startScanResponder();
 
   // "Link LANCER sheet" on any single character/mount token.
   OBR.contextMenu.create({
@@ -108,6 +111,20 @@ OBR.onReady(() => {
       }
       // a dismounted pilot acts in their mech's turn
       const actor = c.kind === "pilot" && c.pm && combatants[c.pm] ? combatants[c.pm] : c;
+      // Irregular start (already played this round, someone else still acting): the hidden background
+      // page can't ask, so it warns and opens the sheet, where "Iniciar outro turno" asks to confirm.
+      const { encounter } = await getRoomState();
+      if (encounter?.status === "active" && encounter.combatants.includes(actor.id)) {
+        const issues: string[] = [];
+        if (actor.used >= Math.max(1, actor.activations)) issues.push(`${actor.name} já jogou nesta rodada`);
+        const other = encounter.actor && encounter.actor !== actor.id ? combatants[encounter.actor] : undefined;
+        if (other) issues.push(`${other.name} ainda está no turno dele`);
+        if (issues.length) {
+          pushToast(`Turno não iniciado: ${issues.join("; ")}. Para iniciar mesmo assim, use o botão na ficha.`, "WARNING");
+          await openSheet(c.id);
+          return;
+        }
+      }
       await startTurn(actor.id);
       const msg = `Turno de ${actor.name}.`;
       pushToast(msg, "INFO");

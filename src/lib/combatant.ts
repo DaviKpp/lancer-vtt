@@ -72,7 +72,13 @@ export function combatantFromNpc(
     activations: s.activations,
     used: 0,
     im: shareableImage(sheet.image),
+    ...(isBiological(sheet) ? { bio: 1 as const } : {}),
   };
+}
+
+/** NPC class (or template) with the Biological tag. */
+export function isBiological(sheet: NpcSheet) {
+  return /biolog/i.test(sheet.tag) || sheet.templates.some((t) => /biolog/i.test(t));
 }
 
 /** Who may see the full card/sheet of a combatant. */
