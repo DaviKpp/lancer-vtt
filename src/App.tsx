@@ -18,7 +18,7 @@ import type { Sheet } from "./lib/types";
 import { applyDestroyed } from "./lib/destroyed";
 import { OPEN_CHANNEL } from "./obr/constants";
 import { removeLegacyTargetTool } from "./obr/targeting";
-import { useObrSession, useObrTheme, useParty, useRoomState, useSceneReady, useSheets, useTemplates } from "./obr/hooks";
+import { useObrSession, useObrTheme, useParty, useReclaimOwnership, useRoomState, useSceneReady, useSheets, useTemplates } from "./obr/hooks";
 
 type Tab = "mechs" | "npcs" | "encounter" | "guide" | "rolls" | "style";
 
@@ -27,6 +27,8 @@ export function App() {
   const room = useRoomState(session.ready);
   const sheets = useSheets();
   const party = useParty(session.ready);
+  // a player back with a new Owlbear id gets their mechs back
+  useReclaimOwnership(session, room.combatants);
   const sceneReady = useSceneReady(session.ready);
   const templates = useTemplates();
   useObrTheme(session.ready);

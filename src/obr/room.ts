@@ -32,8 +32,9 @@ export async function getRoomState(): Promise<RoomState> {
   return readRoomState(await OBR.room.getMetadata());
 }
 
+/** Adds or replaces one combatant (checking the room's 16 kB limit first, with a clear error). */
 export async function putCombatant(state: CombatantState): Promise<void> {
-  await OBR.room.setMetadata({ [COMBATANT_PREFIX + state.id]: state });
+  await putCombatants([state]);
 }
 
 /** Read-modify-write against the latest metadata to keep concurrent edits safe. */

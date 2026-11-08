@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import OBR, { type Player, type Theme } from "@owlbear-rodeo/sdk";
-import { readRoomState, type RoomState } from "./room";
+import { patchCombatants, readRoomState, type RoomState } from "./room";
+import type { CombatantState } from "../lib/types";
 import { sheetStore } from "./sheets";
 import { rollLog } from "./rolls";
 import { templateStore } from "./templates";
@@ -77,6 +78,38 @@ export function useRollLog() {
     (fn) => rollLog.subscribe(fn),
     () => rollLog.list(),
   );
+}
+
+/**
+ * A player who comes back with a new Owlbear id (a guest in another browser session, cleared site
+ * data...) would lose their mechs: they're marked with the old id. Mechs and pilots whose owner has
+ * this player's name and isn't connected right now are claimed back for the current id.
+ */
+export function useReclaimOwnership(
+  session: { ready: boolean; role: string; playerId: string; playerName: string },
+  combatants: Record<string, CombatantState>,
+) {
+  useEffect(() => {
+    if (!session.ready || session.role === "GM" || !session.playerName) return;
+    // keep the owner's name current (a renamed player could not be matched later)
+    const renamed = Object.values(combatants).filter((c) => c.owner === session.playerId && c.ownerName !== session.playerName);
+    if (renamed.length) void patchCombatants(Object.fromEntries(renamed.map((c) => [c.id, { ownerName: session.playerName }])));
+    const candidates = Object.values(combatants).filter(
+      (c) => (c.kind === "mech" || c.kind === "pilot") && c.owner !== session.playerId && c.ownerName === session.playerName,
+    );
+    if (!candidates.length) return;
+    let cancelled = false;
+    void (async () => {
+      // only when that old owner isn't in the room now (two players may share a name)
+      const online = new Set((await OBR.party.getPlayers()).map((p) => p.id));
+      const lost = candidates.filter((c) => !online.has(c.owner));
+      if (cancelled || !lost.length) return;
+      await patchCombatants(Object.fromEntries(lost.map((c) => [c.id, { owner: session.playerId }])));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.ready, session.role, session.playerId, session.playerName, combatants]);
 }
 
 export function useParty(ready: boolean): Player[] {

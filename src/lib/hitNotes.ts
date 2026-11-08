@@ -71,7 +71,8 @@ export function noteFromHit(
     what,
     src: attacker.name,
     srcId: attacker.id,
-    html,
+    // room storage is small (16 kB for everything): keep the note's text short
+    html: html.length > 600 ? `${plainText(html).slice(0, 600)}…` : html, // (plain text: never cut a tag in half)
     until: d.until,
     who: d.whose === "target" ? target.id : d.whose === "attacker" ? attacker.id : undefined,
     started: d.current || undefined,
