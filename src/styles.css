@@ -1540,3 +1540,22 @@ button.tag {
   align-items: center;
   gap: 12px;
 }
+
+/* room storage meter (RoomUsage) */
+.room-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.room-bar .bar-fill {
+  background: var(--hp);
+}
+.room-usage.warn .room-bar .bar-fill {
+  background: #e0a030;
+}
+.room-usage.danger {
+  border-color: #e2382c;
+}
+.room-usage.danger .room-bar .bar-fill {
+  background: #e2382c;
+}

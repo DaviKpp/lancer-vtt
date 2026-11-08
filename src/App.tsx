@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { DicePicker } from "./components/DicePicker";
 import { Dice3dToggle } from "./components/Dice3dToggle";
+import { RoomUsage } from "./components/RoomUsage";
 import { FxPicker } from "./components/FxControls";
 import OBR from "@owlbear-rodeo/sdk";
 import { AppContext, computeTargets, type AppValue } from "./components/AppContext";
@@ -168,6 +169,7 @@ export function App() {
               ))}
             </nav>
             <main className="content">
+              {(tab === "mechs" || tab === "encounter" || tab === "npcs") && <RoomUsage />}
               {tab === "mechs" && (
                 <div className="stack">
                   <ImportButton mode="mech" />

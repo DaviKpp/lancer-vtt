@@ -1,8 +1,7 @@
-import OBR from "@owlbear-rodeo/sdk";
 import type { Metadata } from "@owlbear-rodeo/sdk";
 import type { CombatantState } from "../lib/types";
 import { COMBATANT_PREFIX, ENCOUNTER_KEY } from "./constants";
-import { getRoomState } from "./room";
+import { getRoomState, writeRoom } from "./room";
 import { rollRecharge } from "./recharge";
 import { announce } from "./announce";
 import { notesOnTurn } from "../lib/hitNotes";
@@ -39,7 +38,7 @@ export async function startTurn(id: string) {
   };
   if (encounter) update[ENCOUNTER_KEY] = { ...encounter, actor: id, tk: (encounter.tk ?? 0) + 1 };
   withNotes(update, combatants, id, "start");
-  await OBR.room.setMetadata(update);
+  await writeRoom(update);
   if (recharge) await announce(recharge.message, "INFO", { subject: c, publicMessage: "" });
 }
 
@@ -59,7 +58,7 @@ export async function endTurn(id: string) {
   };
   if (encounter) update[ENCOUNTER_KEY] = { ...encounter, actor: undefined, tk: (encounter.tk ?? 0) + 1 };
   withNotes(update, combatants, id, "end");
-  await OBR.room.setMetadata(update);
+  await writeRoom(update);
 }
 
 export async function currentTurnKey(): Promise<number> {

@@ -7,6 +7,7 @@
 import OBR, { type Metadata } from "@owlbear-rodeo/sdk";
 import type { CombatantState, EncounterState } from "../lib/types";
 import { COMBATANT_PREFIX, ENCOUNTER_KEY, LINK_KEY } from "./constants";
+import { notify } from "./toast";
 
 export interface RoomState {
   combatants: Record<string, CombatantState>;
@@ -32,6 +33,46 @@ export async function getRoomState(): Promise<RoomState> {
   return readRoomState(await OBR.room.getMetadata());
 }
 
+/** The room is out of space (Owlbear keeps at most 16 kB for everything stored in a room). */
+export class RoomFullError extends Error {}
+
+let lastFullWarning = 0;
+async function warnRoomFull(bytes: number) {
+  if (Date.now() - lastFullWarning < 8000) return;
+  lastFullWarning = Date.now();
+  await notify(
+    `A sala do Owlbear está cheia (${(bytes / 1000).toFixed(1)} de 16 kB): a mudança não foi salva. ` +
+      "Remova NPCs ou lancers que não estão em uso, ou limpe os “Efeitos sofridos”.",
+    "ERROR",
+  ).catch(() => undefined);
+}
+
+/**
+ * Every room write goes through here. Owlbear rejects a room over 16 kB, and the change shown on screen
+ * would then quietly undo itself (a mech "resetting" or vanishing): so the size is checked first and the
+ * player is told. Writes that make the room smaller always go through.
+ */
+export async function writeRoom(update: Metadata): Promise<void> {
+  const current = await OBR.room.getMetadata();
+  const next: Metadata = { ...current };
+  for (const [k, v] of Object.entries(update)) {
+    if (v === undefined) delete next[k];
+    else next[k] = v;
+  }
+  const before = roomBytes(current);
+  const after = roomBytes(next);
+  if (after > ROOM_LIMIT && after > before) {
+    await warnRoomFull(after);
+    throw new RoomFullError(`Sala cheia: ${(after / 1000).toFixed(1)} kB de 16 kB`);
+  }
+  try {
+    await OBR.room.setMetadata(update);
+  } catch (e) {
+    await warnRoomFull(after);
+    throw e;
+  }
+}
+
 /** Adds or replaces one combatant (checking the room's 16 kB limit first, with a clear error). */
 export async function putCombatant(state: CombatantState): Promise<void> {
   await putCombatants([state]);
@@ -42,7 +83,7 @@ export async function patchCombatant(id: string, patch: Partial<CombatantState>)
   const { combatants } = await getRoomState();
   const current = combatants[id];
   if (!current) return;
-  await OBR.room.setMetadata({ [COMBATANT_PREFIX + id]: { ...current, ...patch, id } });
+  await writeRoom({ [COMBATANT_PREFIX + id]: { ...current, ...patch, id } });
 }
 
 export async function patchCombatants(patches: Record<string, Partial<CombatantState>>): Promise<void> {
@@ -51,7 +92,7 @@ export async function patchCombatants(patches: Record<string, Partial<CombatantS
   for (const [id, patch] of Object.entries(patches)) {
     if (combatants[id]) update[COMBATANT_PREFIX + id] = { ...combatants[id], ...patch, id };
   }
-  if (Object.keys(update).length) await OBR.room.setMetadata(update);
+  if (Object.keys(update).length) await writeRoom(update);
 }
 
 export async function removeCombatant(id: string): Promise<void> {
@@ -64,7 +105,7 @@ export async function removeCombatant(id: string): Promise<void> {
   if (encounter?.combatants.includes(id)) {
     update[ENCOUNTER_KEY] = { ...encounter, combatants: encounter.combatants.filter((x) => x !== id) };
   }
-  await OBR.room.setMetadata(update);
+  await writeRoom(update);
   if (tokenId) await clearTokenLink(tokenId);
   if (pilot?.tokenId) await clearTokenLink(pilot.tokenId);
 }
@@ -87,7 +128,7 @@ export async function putCombatants(states: CombatantState[], encounter?: Encoun
       `O armazenamento da sala chegaria a ${(projected / 1000).toFixed(1)} kB do limite de 16 kB do Owlbear. Remova alguns combatentes primeiro.`,
     );
   }
-  await OBR.room.setMetadata(update);
+  await writeRoom(update);
 }
 
 /** Removes several combatants in one write (also drops them from the encounter). */
@@ -103,12 +144,12 @@ export async function removeCombatants(ids: string[], encounter?: EncounterState
   const base = encounter !== undefined ? encounter : enc;
   if (base) update[ENCOUNTER_KEY] = { ...base, combatants: base.combatants.filter((x) => !ids.includes(x)) };
   if (encounter === null) update[ENCOUNTER_KEY] = undefined;
-  await OBR.room.setMetadata(update);
+  await writeRoom(update);
   for (const t of tokens) await clearTokenLink(t);
 }
 
 export async function setEncounter(encounter: EncounterState | null): Promise<void> {
-  await OBR.room.setMetadata({ [ENCOUNTER_KEY]: encounter ?? undefined });
+  await writeRoom({ [ENCOUNTER_KEY]: encounter ?? undefined });
 }
 
 // ---------- token links ----------
@@ -135,7 +176,7 @@ export async function linkToken(combatantId: string, tokenId: string): Promise<v
   if (!target) return;
   const previous = target.tokenId;
   update[COMBATANT_PREFIX + combatantId] = { ...target, tokenId };
-  await OBR.room.setMetadata(update);
+  await writeRoom(update);
   if (previous && previous !== tokenId) await clearTokenLink(previous);
   try {
     await OBR.scene.items.updateItems([tokenId], (items) => {
@@ -151,6 +192,6 @@ export async function unlinkToken(combatantId: string): Promise<void> {
   const c = combatants[combatantId];
   if (!c?.tokenId) return;
   const tokenId = c.tokenId;
-  await OBR.room.setMetadata({ [COMBATANT_PREFIX + combatantId]: { ...c, tokenId: undefined } });
+  await writeRoom({ [COMBATANT_PREFIX + combatantId]: { ...c, tokenId: undefined } });
   await clearTokenLink(tokenId);
 }

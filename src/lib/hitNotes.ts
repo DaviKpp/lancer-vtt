@@ -19,6 +19,14 @@ export function plainText(html: string): string {
   return html.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** Plain text of an effect, cut at a word boundary to at most `max` characters. */
+export function shortText(html: string, max = 220): string {
+  const t = plainText(html);
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 30))}…`;
+}
+
 /** Whose turn a phrase like "its next turn" / "do próximo turno dele" means. */
 function ownerOf(owner: string, before: string, attackerIsNpc: boolean): "attacker" | "target" {
   if (TARGET_WORDS.test(owner)) return "target";
@@ -71,8 +79,9 @@ export function noteFromHit(
     what,
     src: attacker.name,
     srcId: attacker.id,
-    // room storage is small (16 kB for everything): keep the note's text short
-    html: html.length > 600 ? `${plainText(html).slice(0, 600)}…` : html, // (plain text: never cut a tag in half)
+    // room storage is tiny (16 kB for the whole room, shared with other extensions): keep only a
+    // short plain-text version of the effect
+    html: shortText(html),
     until: d.until,
     who: d.whose === "target" ? target.id : d.whose === "attacker" ? attacker.id : undefined,
     started: d.current || undefined,
