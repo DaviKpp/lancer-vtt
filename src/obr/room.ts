@@ -6,8 +6,9 @@
 // numbers live here and the full sheets travel over broadcast (see sheets.ts).
 import OBR, { type Metadata } from "@owlbear-rodeo/sdk";
 import type { CombatantState, EncounterState } from "../lib/types";
-import { COMBATANT_PREFIX, ENCOUNTER_KEY, LINK_KEY } from "./constants";
+import { COMBATANT_PREFIX, ENCOUNTER_KEY, ID, LINK_KEY } from "./constants";
 import { notify } from "./toast";
+import { decodeCombatant, encodeCombatant } from "../lib/compact";
 
 export interface RoomState {
   combatants: Record<string, CombatantState>;
@@ -18,8 +19,8 @@ export function readRoomState(metadata: Metadata): RoomState {
   const combatants: Record<string, CombatantState> = {};
   for (const [key, value] of Object.entries(metadata)) {
     if (key.startsWith(COMBATANT_PREFIX) && value && typeof value === "object") {
-      const c = value as CombatantState;
-      combatants[c.id] = c;
+      const c = decodeCombatant(key.slice(COMBATANT_PREFIX.length), value);
+      if (c) combatants[c.id] = c;
     }
   }
   const enc = metadata[ENCOUNTER_KEY];
@@ -31,6 +32,13 @@ export function readRoomState(metadata: Metadata): RoomState {
 
 export async function getRoomState(): Promise<RoomState> {
   return readRoomState(await OBR.room.getMetadata());
+}
+
+/** Removals made on purpose are announced here, so the guard (obr/guard.ts) doesn't restore them. */
+export const REMOVED_CHANNEL = `${ID}/removed`;
+async function announceRemoved(ids: string[]) {
+  if (!ids.length) return;
+  await OBR.broadcast.sendMessage(REMOVED_CHANNEL, { ids }, { destination: "ALL" }).catch(() => undefined);
 }
 
 /** The room is out of space (Owlbear keeps at most 16 kB for everything stored in a room). */
@@ -52,7 +60,12 @@ async function warnRoomFull(bytes: number) {
  * would then quietly undo itself (a mech "resetting" or vanishing): so the size is checked first and the
  * player is told. Writes that make the room smaller always go through.
  */
-export async function writeRoom(update: Metadata): Promise<void> {
+export async function writeRoom(plain: Metadata): Promise<void> {
+  // combatants are stored compact (short keys, no empty values)
+  const update: Metadata = {};
+  for (const [k, v] of Object.entries(plain)) {
+    update[k] = k.startsWith(COMBATANT_PREFIX) && v && typeof v === "object" ? encodeCombatant(v as CombatantState) : v;
+  }
   const current = await OBR.room.getMetadata();
   const next: Metadata = { ...current };
   for (const [k, v] of Object.entries(update)) {
@@ -105,6 +118,7 @@ export async function removeCombatant(id: string): Promise<void> {
   if (encounter?.combatants.includes(id)) {
     update[ENCOUNTER_KEY] = { ...encounter, combatants: encounter.combatants.filter((x) => x !== id) };
   }
+  await announceRemoved(pilot ? [id, pilot.id] : [id]);
   await writeRoom(update);
   if (tokenId) await clearTokenLink(tokenId);
   if (pilot?.tokenId) await clearTokenLink(pilot.tokenId);
@@ -118,16 +132,10 @@ export function roomBytes(metadata: Metadata): number {
 
 /** Adds several combatants (and optionally a new encounter value) in one metadata write. */
 export async function putCombatants(states: CombatantState[], encounter?: EncounterState | null): Promise<void> {
-  const current = await OBR.room.getMetadata();
   const update: Metadata = {};
   for (const s of states) update[COMBATANT_PREFIX + s.id] = s;
   if (encounter !== undefined) update[ENCOUNTER_KEY] = encounter ?? undefined;
-  const projected = roomBytes({ ...current, ...update });
-  if (projected > ROOM_LIMIT - 300) {
-    throw new Error(
-      `O armazenamento da sala chegaria a ${(projected / 1000).toFixed(1)} kB do limite de 16 kB do Owlbear. Remova alguns combatentes primeiro.`,
-    );
-  }
+  // (writeRoom checks the 16 kB limit and tells the player)
   await writeRoom(update);
 }
 
@@ -144,6 +152,7 @@ export async function removeCombatants(ids: string[], encounter?: EncounterState
   const base = encounter !== undefined ? encounter : enc;
   if (base) update[ENCOUNTER_KEY] = { ...base, combatants: base.combatants.filter((x) => !ids.includes(x)) };
   if (encounter === null) update[ENCOUNTER_KEY] = undefined;
+  await announceRemoved(ids);
   await writeRoom(update);
   for (const t of tokens) await clearTokenLink(t);
 }

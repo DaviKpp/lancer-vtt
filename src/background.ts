@@ -12,6 +12,7 @@ import { announce } from "./obr/announce";
 import { getRoomState } from "./obr/room";
 import { startTurn } from "./obr/turns";
 import { startScanResponder } from "./obr/scan";
+import { startGuard } from "./obr/guard";
 
 /** Opens the extension on a combatant's sheet (the popover may not be mounted yet). */
 async function openSheet(id: string) {
@@ -35,6 +36,8 @@ OBR.onReady(() => {
   listenDice();
   // Scans from players are answered with the GM's copy of the sheets.
   startScanResponder();
+  // Puts back combatants that vanish from the room by accident (refused write, conflicts...).
+  startGuard();
 
   // "Link LANCER sheet" on any single character/mount token.
   OBR.contextMenu.create({

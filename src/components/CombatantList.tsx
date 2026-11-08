@@ -55,7 +55,7 @@ export function CombatantCard({ c, compact }: { c: CombatantState; compact?: boo
   const remove = async () => {
     if (!window.confirm(`Remover ${c.name} da sala?`)) return;
     await removeCombatant(c.id);
-    sheetStore.remove(c.id);
+    await sheetStore.forget(c.id);
   };
 
 

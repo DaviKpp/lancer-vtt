@@ -45,7 +45,11 @@ class SheetStore {
     this.identity = identity;
   }
 
-  /** Called whenever room state changes: prunes deleted combatants and fetches missing sheets. */
+  /**
+   * Called whenever room state changes: fetches missing sheets. Sheets are NOT dropped just because
+   * their combatant is missing from the room for a moment (a refused write, a restore on the way):
+   * they go only when someone removes the combatant on purpose (`forget`, broadcast as "drop").
+   */
   syncWithRoom(combatants: Record<string, CombatantState>) {
     this.combatants = combatants;
     let changed = false;
@@ -55,12 +59,6 @@ class SheetStore {
         this.orphans.delete(id);
         changed = true;
       } else if (Date.now() - o.at > 60000) this.orphans.delete(id);
-    }
-    for (const id of Array.from(this.sheets.keys())) {
-      if (!combatants[id]) {
-        this.sheets.delete(id);
-        changed = true;
-      }
     }
     if (changed) this.persistAndNotify();
     const missing = Object.values(combatants)
@@ -101,6 +99,12 @@ class SheetStore {
 
   remove(id: string) {
     if (this.sheets.delete(id)) this.persistAndNotify();
+  }
+
+  /** The combatant was removed on purpose: drop its sheet here and on every other client. */
+  async forget(id: string) {
+    this.remove(id);
+    await this.send({ t: "drop", id });
   }
 
   // ---------- internals ----------

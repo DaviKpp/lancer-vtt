@@ -34,5 +34,5 @@ export async function spawnFromTemplate(tpl: NpcSheet, count: number, gm: { id: 
 export async function deleteInstances(ids: string[], endEncounter = false) {
   if (!ids.length && !endEncounter) return;
   await removeCombatants(ids, endEncounter ? null : undefined);
-  ids.forEach((id) => sheetStore.remove(id));
+  await Promise.all(ids.map((id) => sheetStore.forget(id)));
 }
